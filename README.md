@@ -5,5 +5,5 @@
 - John Nasitem
 - Ethan Chen
 - Michelle Deng
-- Chris 
+- Chris Nghiem
 - Aaron Yee
