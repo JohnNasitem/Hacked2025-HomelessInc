@@ -1,16 +1,23 @@
-# This is a sample Python script.
+import discord
+from discord.ext import commands
+import os
+from dotenv import load_dotenv
 
-# Press Ctrl+F5 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+load_dotenv()
+
+TOKEN = os.getenv("BOT_TOKEN")
+intents = discord.Intents.default()
+intents.message_content = True  # Enable message content intent
+bot = commands.Bot(command_prefix='!', intents=intents)
 
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press F9 to toggle the breakpoint.
+@bot.event
+async def on_ready():
+    print(f'Logged in as {bot.user}')
 
+@bot.command()
+async def ping(ctx):
+    print('User sent a command!')
+    await ctx.send('Pong!')
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+bot.run(TOKEN)
