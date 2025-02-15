@@ -23,6 +23,6 @@ async def ping(ctx):
 @bot.command()
 async def close(ctx):
     print('User sent a command!')
-    await bot.close()
+    await ctx.close()
 
 bot.run(TOKEN)
