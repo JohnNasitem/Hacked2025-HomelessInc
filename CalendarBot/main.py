@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 import os
 from dotenv import load_dotenv
+import asyncio
 
 load_dotenv()
 
@@ -15,9 +16,14 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 async def on_ready():
     print(f'Logged in as {bot.user}')
 
-@bot.command()
-async def ping(ctx):
-    print('User sent a command!')
-    await ctx.send('Pong!')
+async def load():
+    for filename in os.listdir("./cogs"):
+        if filename.endswith(".py"):
+            await bot.load_extension(f'cogs.{filename[:-3]}')
 
-bot.run(TOKEN)
+async def main():
+    await load()
+    await bot.start(TOKEN)
+
+asyncio.run(main())
+
