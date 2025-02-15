@@ -23,6 +23,6 @@ async def ping(ctx):
 @bot.command()
 async def john(ctx):
     print('User sent a command!')
-    await ctx.send('@Eatdatpizza is bald and beautiful')
+    await ctx.send('<@357657793215332357> is bald and beautiful')
 
 bot.run(TOKEN)
