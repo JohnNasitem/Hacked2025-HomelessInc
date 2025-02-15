@@ -1,0 +1,21 @@
+import discord
+from discord.ext import commands
+
+# Replace the name with the name of the category
+class Ping(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        print("Bot is online!")
+
+    #replace this command with your command
+    #can add as many commands as you want
+    @commands.command()
+    async def ping(self, ctx):
+        await ctx.send("Pong!!")
+
+async def setup(bot):
+    #replace the Ping(bot) with the new name of the class
+    await bot.add_cog(Ping(bot))
