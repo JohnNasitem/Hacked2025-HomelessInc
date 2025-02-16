@@ -27,45 +27,26 @@ class Availability(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print("Bot is online!")
-
-    @commands.command(name="sa")
-    async def specificAvailability(self, ctx):
-        """
-        Parse the message to ge the userID, start date_time and end date_time
         
+    @app_commands.command(name="set-availability", description="Set your availability for a specific time period")
+    async def setAvailability(self, interaction: discord.Interaction, start: str, end: str, repeating: bool):
+        """
+        Set the availability for a specific time period
+
         Returns:
-            (userID, start date_time, end date_time) if the message is in the correct format
+            (userID, start date_time, end date_time, repeating) if the message is in the correct format
             -1 otherwise
         """
         try:
-            # tidying up the content before passing it to the logic
-            content = ctx.message.content
-            no_command = content.replace(f"!{ctx.command.name}", "").strip()  # remove the command part from the content (command removed)
-            start_end = no_command.split(",")  # list with start and end datetimes
-
-            if len(start_end) != 2:  # if there are not exactly two date_times
-                raise Exception("Invalid number of arguments.")
-            
-            # remove the extra spaces around start and end date_times
-            start = start_end[0].strip()
-            end = start_end[1].strip()
-
             if not self._correctFormat(start) or not self._correctFormat(end):  # verify if start and end correctly formatted
                 raise Exception("Invalid date_time format.")
             
-            await ctx.send(f"userID: {ctx.author.id} Start: {start}, End: {end}")  # test command remove later
-            return (ctx.author.id, start, end)
+            await interaction.response.send_message(f"userID: {interaction.user.id} Start: {start}, End: {end}, Repeating: {repeating}")  # test command remove later
+            return (interaction.user.id, start, end, repeating)
         
         except Exception as exception:
-            await ctx.send(f"{exception} Please provide the date_time in the following format: YYYY-MM-DD HH:MM")
+            await interaction.response.send_message(f"{exception} Please provide the date_time in the following format: YYYY-MM-DD HH:MM")
             return -1
-        
-    @app_commands.command(name="set-availability", description="Set your availability for a specific time period")
-    async def setAvailability(self, interaction: discord.Interaction, start: str, end: str):
-        """
-            
-        """
-        await interaction.response.send_message("Test")
 
 
 async def setup(bot):
