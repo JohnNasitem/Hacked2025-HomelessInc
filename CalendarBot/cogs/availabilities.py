@@ -69,6 +69,7 @@ week = [
     Day(381874990783528960, "Sunday", "8:00 am", "11:00 am"),
 ]
 
+
 class Availability(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -77,7 +78,8 @@ class Availability(commands.Cog):
     async def on_ready(self):
         print("Bot is online!")
 
-    def _correctFormat(self, date_time):
+    @staticmethod
+    def _correctFormat(date_time):
         """
         Check if date_time is in the following formats:
         YYYY-MM-DD HH:MM
@@ -133,19 +135,6 @@ class Availability(commands.Cog):
                 await ctx.send("Here is your image!", file=discord.File(f))
         except Exception as e:
             await ctx.send(f"Couldn't Generate Image\n{e}")
-
-    @app_commands.command(name="embed", description="Send an embed message")
-    async def app_embed(self, interaction: discord.Interaction):
-        embed = discord.Embed(
-            colour=discord.Colour.dark_teal(),
-            description="this is the description",
-            title="this is the title"
-        )
-
-        embed.set_footer(text="this is the footer")
-        embed.set_author(name="this is the author")
-
-        await interaction.response.send_message(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Availability(bot))
