@@ -5,6 +5,7 @@ import random
 from discord.ext import commands
 from discord import app_commands
 from PIL import Image, ImageDraw, ImageFont
+import os
 
 col_header_font = ImageFont.truetype("arial.ttf", 50)
 row_header_font = ImageFont.truetype("arial.ttf", 30)
@@ -160,16 +161,6 @@ async def create_image(bot, week_data, show_overlap_count = True):
         :return: Color Dictionary (user_id: color)
         """
 
-        # def generate_light_color():
-        #     """
-        #     Generate light colours
-        #     :return: r, g, b values
-        #     """
-        #     r_int = random.randint(180, 255)
-        #     g_int = random.randint(180, 255)
-        #     b_int = random.randint(180, 255)
-        #     return r_int, g_int, b_int
-
         def generate_light_color():
             """
             Generate a light color, avoiding brown or gray shades.
@@ -204,11 +195,11 @@ async def create_image(bot, week_data, show_overlap_count = True):
         Makes a unique list of user ids from the week_data
         :return: list of unique ids
         """
-        unique_ids = []
+        unique_ids_list = []
         for week_data_item in week_data:
-            if week_data_item.user_id not in unique_ids:
-                unique_ids.append(week_data_item.user_id)
-        return unique_ids
+            if week_data_item.user_id not in unique_ids_list:
+                unique_ids_list.append(week_data_item.user_id)
+        return unique_ids_list
 
     def get_time_index(time_string):
         """
