@@ -123,13 +123,20 @@ class Availability(commands.Cog):
             await interaction.response.send_message(f"{exception} Please provide the date_time in the following format: YYYY-MM-DD HH:MM")
             return None
 
+    @commands.command()
+    async def image(self, ctx):
+        try:
+            create_image(week, True)
+            with open('generated_images/schedule.png', 'rb') as f:
+                await ctx.send("Here is your image!", file=discord.File(f))
+        except Exception as e:
+            await ctx.send(f"Couldn't Generate Image\n{e}")
 
 async def setup(bot):
     await bot.add_cog(Availability(bot))
 
 # TODO: Add legend for each color in the color table, dont show if only 1 person is being viewed (or not :shrug:)
-# TODO: Add numbers for overlaps number will represent how many sections (from different users) are overlapping (iterate through each cell maybe)
-def create_image(week_data):
+def create_image(week_data, show_overlap_count):
     """
     Create an image using a list of days, legend will be included if more than one user id exists in the list.
     :param week_data: list holding instances of Day
@@ -176,18 +183,30 @@ def create_image(week_data):
                 unique_ids.append(week_data_item.user_id)
         return unique_ids
 
-    #generates the white background
+    def get_time_index(time_string):
+        """
+        Get time index of the time string.
+        :param time_string: time string in the format of 8:30 am
+        :return: index of that string
+        """
+        time_match = re.match(time_regex_string, time_string)
+        time_i = 0 if time_match.group(3) == "am" else 24
+        time_i += (int(time_match.group(1)) % 12) * 2
+        time_i += 0 if time_match.group(2) == "00" else 1
+        return time_i
+
+    # Get colour table
     colour_table = generate_colour_table(get_unique_ids())
+    # Generates the white background
     background = Image.new('RGBA', (2300, 2500), color=(255, 255, 255, 255))
-    #sets drawing canvas to the background
+    # Sets drawing canvas to the background
     draw = ImageDraw.Draw(background)
     # Load pixels for line drawing
     pixels = background.load()
-    #get colour table
 
     # Populate row headers and draw horizontal lines
     for rowIndex in range(48):
-        #add row header
+        # Add row header
         text = str(rowIndex % 24 // 2)
         if text == "0":
             text = "12"
@@ -195,7 +214,7 @@ def create_image(week_data):
         text += " am" if rowIndex < 24 else " pm"
         draw.text((100, 135 + (rowIndex * 50)), text, font=row_header_font, fill=(0, 0, 0), anchor="ms")
 
-        #add horizontal line
+        # Add horizontal line
         for x in range(background.width):
             pixels[x, 100 + (rowIndex * 50)] = (0, 0, 0)
 
@@ -204,7 +223,7 @@ def create_image(week_data):
         #add column header
         draw.text((350 + (colIndex * 300), 60), day, font=col_header_font, fill=(0, 0, 0), anchor="ms")
 
-        #add vertical lines
+        # Add vertical lines
         for y in range(background.height):
             pixels[200 + (colIndex * 300), y] = (0, 0, 0)
 
@@ -214,14 +233,10 @@ def create_image(week_data):
         overlay = Image.new('RGBA', (2300, 2500), color=(255, 255, 255, 0))
         draw = ImageDraw.Draw(overlay)
 
-        #convert start and end times to y positions
+        # Convert start and end times to y positions
         y_indices = []
         for day_time in [day.start_time, day.end_time]:
-            match = re.match(time_regex_string, day_time)
-            y_index = 0 if match.group(3) == "am" else 24
-            y_index += (int(match.group(1)) % 12) * 2
-            y_index += 0 if match.group(2) == "00" else 1
-            y_indices.append(100 + (y_index * 50))
+            y_indices.append(100 + (get_time_index(day_time) * 50))
 
         # Draw rectangle on the overlay
         draw.rectangle([(200 + (days_of_week.index(day.weekday) * 300), y_indices[0]),
@@ -230,6 +245,15 @@ def create_image(week_data):
 
         # Composite this overlay onto the background
         background = Image.alpha_composite(background, overlay)
+
+    # Display the number of overlaps in each cell
+    if show_overlap_count:
+        draw = ImageDraw.Draw(background)
+        for colIndex, day_in_week in enumerate(days_of_week):
+            for time_index in range(48):
+                count = len([time_slot for time_slot in week if get_time_index(time_slot.start_time) <= time_index < get_time_index(time_slot.end_time) and time_slot.weekday == day_in_week])
+                if count != 0:
+                    draw.text((350 + (colIndex * 300), 135 + (time_index * 50)), str(count), font=row_header_font, fill=(0, 0, 0), anchor="ms")
 
     # Save and show the result
     background.save('generated_images/schedule.png')
