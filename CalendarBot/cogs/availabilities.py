@@ -304,4 +304,4 @@ async def create_image(bot, week_data, show_overlap_count = True):
     # Ensure folder exists
     os.makedirs(output_folder, exist_ok=True)
     # Save and show the result
-    background.save('generated_images/schedule.png')
+    background.save(f'{output_folder}/schedule.png')
