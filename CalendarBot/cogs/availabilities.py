@@ -257,3 +257,11 @@ def create_image(week_data, show_overlap_count):
 
     # Save and show the result
     background.save('generated_images/schedule.png')
+
+
+
+
+
+@app_commands.command(name="view-events", description="View all events")
+async def viewEvents(self, interaction: discord.Interaction):
+    await interaction.response.send_message("Viewing all events")
