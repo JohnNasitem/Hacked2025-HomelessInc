@@ -101,6 +101,8 @@ class Availability(commands.Cog):
         Returns:
             (userID, start date_time, end date_time, repeating) if the message is in the correct format
             -1 otherwise
+
+        shouts out to chris for getting slash commands to work
         """
         try:
             if not self._correctFormat(start) or not self._correctFormat(end):  # verify if start and end correctly formatted
