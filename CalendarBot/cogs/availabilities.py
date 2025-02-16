@@ -96,6 +96,7 @@ class Availability(commands.Cog):
     @app_commands.command(name="set-availability", description="Set your availability for a specific time period")
     @app_commands.describe(repeating="Choose how often this availability repeats")
     @app_commands.choices(repeating=[
+        discord.app_commands.Choice(name="Does not repeat", value="false"),
         discord.app_commands.Choice(name="Daily", value="daily"),
         discord.app_commands.Choice(name="Weekly", value="weekly"),
         discord.app_commands.Choice(name="Monthly", value="monthly")
@@ -161,6 +162,16 @@ async def create_image(bot, week_data, show_overlap_count = True):
         :return: Color Dictionary (user_id: color)
         """
 
+        # def generate_light_color():
+        #     """
+        #     Generate light colours
+        #     :return: r, g, b values
+        #     """
+        #     r_int = random.randint(180, 255)
+        #     g_int = random.randint(180, 255)
+        #     b_int = random.randint(180, 255)
+        #     return r_int, g_int, b_int
+
         def generate_light_color():
             """
             Generate a light color, avoiding brown or gray shades.
@@ -195,11 +206,11 @@ async def create_image(bot, week_data, show_overlap_count = True):
         Makes a unique list of user ids from the week_data
         :return: list of unique ids
         """
-        unique_ids_list = []
+        unique_ids = []
         for week_data_item in week_data:
-            if week_data_item.user_id not in unique_ids_list:
-                unique_ids_list.append(week_data_item.user_id)
-        return unique_ids_list
+            if week_data_item.user_id not in unique_ids:
+                unique_ids.append(week_data_item.user_id)
+        return unique_ids
 
     def get_time_index(time_string):
         """
@@ -304,4 +315,4 @@ async def create_image(bot, week_data, show_overlap_count = True):
     # Ensure folder exists
     os.makedirs(output_folder, exist_ok=True)
     # Save and show the result
-    background.save(f'{output_folder}/schedule.png')
+    background.save('generated_images/schedule.png')
