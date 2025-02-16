@@ -117,8 +117,8 @@ class Availability(commands.Cog):
         """
         Convert date and time to a Unix timestamp
         """
-        date_time = datetime.strptime(f"{date, time}", "%Y-%m-%d %I:%M %p")
-        return datetime.timestamp()
+        date_time = datetime.strptime(f"{date} {time}", "%Y-%m-%d %I:%M %p")
+        return int(datetime.timestamp(date_time))
 
 
     @staticmethod
@@ -155,13 +155,13 @@ class Availability(commands.Cog):
         try:
             if not self._correctDateTimeFormat(day, start_time) or not self._correctDateTimeFormat(day, end_time):  # verify if start and end correctly formatted
                 raise Exception("Invalid date_time format.")
-
-            await interaction.response.send_message(f"Set availability for <@{interaction.user.id}> on <t:{datetime.timestamp(day)}> from ```{self._convert}``` to ```{end_time}``` repeating: {repeating}")
+            
+            await interaction.response.send_message(f"Set availability for <@{interaction.user.id}> from <t:{self._convertToUnix(day, start_time)}> to <t:{self._convertToUnix(day, end_time)}> repeating: {repeating}")
 
             add_availability(interaction.user.id, day, start_time, end_time, repeating)
         
         except Exception as exception:
-            await interaction.response.send_message(f"{exception} Please provide the times in the following format: YYYY-MM-DD HH:MM (12-hour)")
+            await interaction.response.send_message(f"{exception} Please provide the times in the following format: YYYY-MM-DD HH:MM AM/PM")
             return None
 
     @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
