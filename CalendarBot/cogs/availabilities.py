@@ -115,8 +115,8 @@ class Availability(commands.Cog):
             
             print(f"Repeating: \"{repeating}\"")
             
-            await interaction.response.send_message(f"Set availability for <@{interaction.user.id}> from {start} to {end} repeating: {repeating}")
-            await interaction.response.send_message(f"userID: {interaction.user.id} Start: {start}, End: {end}, Repeating: {repeating}")  # test command remove later
+            await interaction.response.send_message(f"Set availability for <@{interaction.user.id}> from {start} to {end} repeating: {repeating}" + 
+                                                    f"\nuserID: {interaction.user.id} Start: {start}, End: {end}, Repeating: {repeating}")
             return interaction.user.id, start, end, repeating
         
         except Exception as exception:
@@ -257,11 +257,3 @@ def create_image(week_data, show_overlap_count):
 
     # Save and show the result
     background.save('generated_images/schedule.png')
-
-
-
-
-
-@app_commands.command(name="view-events", description="View all events")
-async def viewEvents(self, interaction: discord.Interaction):
-    await interaction.response.send_message("Viewing all events")
