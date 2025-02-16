@@ -122,7 +122,7 @@ class Availability(commands.Cog):
         except Exception as exception:
             await interaction.response.send_message(f"{exception} Please provide the date_time in the following format: YYYY-MM-DD HH:MM")
             return None
-
+        
     @commands.command()
     async def image(self, ctx):
         try:
@@ -131,6 +131,19 @@ class Availability(commands.Cog):
                 await ctx.send("Here is your image!", file=discord.File(f))
         except Exception as e:
             await ctx.send(f"Couldn't Generate Image\n{e}")
+
+    @app_commands.command(name="embed", description="Send an embed message")
+    async def app_embed(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            colour=discord.Colour.dark_teal(),
+            description="this is the description",
+            title="this is the title"
+        )
+
+        embed.set_footer(text="this is the footer")
+        embed.set_author(name="this is the author")
+
+        await interaction.response.send_message(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Availability(bot))
