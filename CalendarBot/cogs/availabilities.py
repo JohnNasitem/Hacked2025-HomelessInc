@@ -13,9 +13,10 @@ database = sqlite3.connect("database.db")
 cursor = database.cursor()
 database.execute("DROP TABLE IF EXISTS availability")
 database.execute("""CREATE TABLE IF NOT EXISTS availability(
-                 USERID INTEGER, 
-                 StartTime DATETIME,
-                 EndTime DATETIME,
+                 USERID INTEGER,
+                 AVAILABILITYDATE DATE
+                 StartTime STRING,
+                 EndTime STRING,
                  RECURRING TEXT
                  )""")
 
@@ -30,56 +31,56 @@ class Day:
     """
     Holds an availability slot on the selected day for a specific user
     """
-    def __init__(self, user_id, weekday, start_time, end_time):
+    def __init__(self, user_id, date, start_time, end_time):
         self.user_id = user_id
-        self.weekday = weekday
+        self.date = date
         self.start_time = start_time
         self.end_time = end_time
 
 #harded coded text values
 week = [
     # ID 1 (Person 1)
-    Day(357657793215332357, "Monday", "8:00 am", "12:00 pm"),
-    Day(357657793215332357, "Monday", "1:00 pm", "4:00 pm"),
-    Day(357657793215332357, "Tuesday", "9:00 am", "12:00 pm"),
-    Day(357657793215332357, "Wednesday", "7:30 am", "11:30 am"),
-    Day(357657793215332357, "Thursday", "10:00 am", "2:00 pm"),
-    Day(357657793215332357, "Friday", "8:30 am", "12:30 pm"),
-    Day(357657793215332357, "Saturday", "9:00 am", "11:30 am"),
-    Day(357657793215332357, "Sunday", "10:00 am", "12:30 pm"),
+    Day(357657793215332357, "2025-02-16", "8:00 am", "12:00 pm"),
+    Day(357657793215332357, "2025-02-17", "1:00 pm", "4:00 pm"),
+    Day(357657793215332357, "2025-02-18", "9:00 am", "12:00 pm"),
+    Day(357657793215332357, "2025-02-19", "7:30 am", "11:30 am"),
+    Day(357657793215332357, "2025-02-20", "10:00 am", "2:00 pm"),
+    Day(357657793215332357, "2025-02-21", "8:30 am", "12:30 pm"),
+    Day(357657793215332357, "2025-02-22", "9:00 am", "11:30 am"),
+    Day(357657793215332357, "2025-02-23", "10:00 am", "12:30 pm"),
 
     # ID 2 (Person 2)
-    Day(799817805099827200, "Monday", "7:00 am", "11:00 am"),
-    Day(799817805099827200, "Monday", "12:00 pm", "4:00 pm"),
-    Day(799817805099827200, "Tuesday", "8:00 am", "12:00 pm"),
-    Day(799817805099827200, "Wednesday", "6:30 am", "10:30 am"),
-    Day(799817805099827200, "Thursday", "9:00 am", "1:00 pm"),
-    Day(799817805099827200, "Friday", "8:00 am", "12:00 pm"),
-    Day(799817805099827200, "Saturday", "7:30 am", "11:30 am"),
-    Day(799817805099827200, "Sunday", "9:00 am", "12:00 pm"),
+    Day(799817805099827200, "2025-02-16", "7:00 am", "11:00 am"),
+    Day(799817805099827200, "2025-02-17", "12:00 pm", "4:00 pm"),
+    Day(799817805099827200, "2025-02-18", "8:00 am", "12:00 pm"),
+    Day(799817805099827200, "2025-02-19", "6:30 am", "10:30 am"),
+    Day(799817805099827200, "2025-02-20", "9:00 am", "1:00 pm"),
+    Day(799817805099827200, "2025-02-21", "8:00 am", "12:00 pm"),
+    Day(799817805099827200, "2025-02-22", "7:30 am", "11:30 am"),
+    Day(799817805099827200, "2025-02-23", "9:00 am", "12:00 pm"),
 
     # ID 3 (Person 3)
-    Day(183651970526085120, "Monday", "8:00 am", "12:00 pm"),
-    Day(183651970526085120, "Wednesday", "9:00 am", "1:00 pm"),
-    Day(183651970526085120, "Thursday", "2:00 pm", "5:00 pm"),
-    Day(183651970526085120, "Friday", "10:00 am", "1:00 pm"),
-    Day(183651970526085120, "Saturday", "2:30 pm", "5:30 pm"),
-    Day(183651970526085120, "Sunday", "12:00 pm", "4:00 pm"),
+    Day(183651970526085120, "2025-02-16", "8:00 am", "12:00 pm"),
+    Day(183651970526085120, "2025-02-17", "9:00 am", "1:00 pm"),
+    Day(183651970526085120, "2025-02-18", "2:00 pm", "5:00 pm"),
+    Day(183651970526085120, "2025-02-19", "10:00 am", "1:00 pm"),
+    Day(183651970526085120, "2025-02-20", "2:30 pm", "5:30 pm"),
+    Day(183651970526085120, "2025-02-21", "12:00 pm", "4:00 pm"),
 
     # ID 4 (Person 4)
-    Day(401501356327698434, "Tuesday", "10:00 am", "1:00 pm"),
-    Day(401501356327698434, "Thursday", "11:00 am", "2:00 pm"),
-    Day(401501356327698434, "Friday", "9:30 am", "12:30 pm"),
-    Day(401501356327698434, "Saturday", "3:00 pm", "6:00 pm"),
-    Day(401501356327698434, "Sunday", "10:00 am", "12:30 pm"),
+    Day(401501356327698434, "2025-02-16", "10:00 am", "1:00 pm"),
+    Day(401501356327698434, "2025-02-17", "11:00 am", "2:00 pm"),
+    Day(401501356327698434, "2025-02-18", "9:30 am", "12:30 pm"),
+    Day(401501356327698434, "2025-02-19", "3:00 pm", "6:00 pm"),
+    Day(401501356327698434, "2025-02-20", "10:00 am", "12:30 pm"),
 
     # ID 5 (Person 5)
-    Day(381874990783528960, "Monday", "9:00 am", "1:00 pm"),
-    Day(381874990783528960, "Wednesday", "2:00 pm", "5:00 pm"),
-    Day(381874990783528960, "Thursday", "8:00 am", "12:00 pm"),
-    Day(381874990783528960, "Friday", "11:30 am", "2:30 pm"),
-    Day(381874990783528960, "Saturday", "1:00 pm", "4:00 pm"),
-    Day(381874990783528960, "Sunday", "8:00 am", "11:00 am"),
+    Day(381874990783528960, "2025-02-16", "9:00 am", "1:00 pm"),
+    Day(381874990783528960, "2025-02-17", "2:00 pm", "5:00 pm"),
+    Day(381874990783528960, "2025-02-18", "8:00 am", "12:00 pm"),
+    Day(381874990783528960, "2025-02-19", "11:30 am", "2:30 pm"),
+    Day(381874990783528960, "2025-02-20", "1:00 pm", "4:00 pm"),
+    Day(381874990783528960, "2025-02-21", "8:00 am", "11:00 am"),
 ]
 
 
@@ -118,13 +119,10 @@ class Availability(commands.Cog):
         :param row:
         :return:
         """
-        dt_start = datetime.strptime(row[1], '%Y-%m-%d %H:%M')
-        dt_end = datetime.strptime(row[2], '%Y-%m-%d %H:%M')
-        new_day_user_id = row[0]
-        new_day_day_of_week = dt_start.strftime('%A')  # '%A' gives the full weekday name
-        new_day_start_time = dt_start.strftime("%I:%M %p")
-        new_day_end_time = dt_end.strftime("%I:%M %p")
-        return Day(new_day_user_id, new_day_day_of_week, new_day_start_time, new_day_end_time)
+        dt_date = datetime.strptime(row[1], '%Y-%m-%d')
+        dt_start_time = datetime.strptime(row[2], "%H:%M")
+        dt_end_time = datetime.strptime(row[3], "%H:%M")
+        return Day(row[0], dt_date.strftime('%Y-%m-%d'), dt_date.strftime('%A'), dt_start_time.strftime("%I:%M %p"), dt_end_time.strftime("%I:%M %p"))
 
     @app_commands.command(name="set-availability", description="Set your availability for a specific time period")
     @app_commands.describe(repeating="Choose how often this availability repeats")
@@ -319,8 +317,10 @@ async def create_image(bot, week_data, show_overlap_count = True):
             y_indices.append(100 + (get_time_index(day_time) * 50))
 
         # Draw rectangle on the overlay
-        draw.rectangle([(200 + (days_of_week.index(day.weekday) * 300), y_indices[0]),
-                        (500 + (days_of_week.index(day.weekday) * 300), y_indices[1])],
+        date_obj = datetime.strptime(day.date, '%Y-%m-%d')
+        day_of_week = date_obj.strftime('%A')
+        draw.rectangle([(200 + (days_of_week.index(day_of_week) * 300), y_indices[0]),
+                        (500 + (days_of_week.index(day_of_week) * 300), y_indices[1])],
                        fill=colour_table[day.user_id])
 
         # Composite this overlay onto the background
@@ -332,7 +332,7 @@ async def create_image(bot, week_data, show_overlap_count = True):
         # Nested loop to iterate through each cell
         for colIndex, day_in_week in enumerate(days_of_week):
             for time_index in range(48):
-                count = len([time_slot for time_slot in week if get_time_index(time_slot.start_time) <= time_index < get_time_index(time_slot.end_time) and time_slot.weekday == day_in_week])
+                count = len([time_slot for time_slot in week if get_time_index(time_slot.start_time) <= time_index < get_time_index(time_slot.end_time) and datetime.strptime(time_slot.date, '%Y-%m-%d').strftime('%A') == day_in_week])
                 if count != 0:
                     draw.text((350 + (colIndex * 300), 135 + (time_index * 50)), str(count), font=row_header_font, fill=(0, 0, 0), anchor="ms")
 
