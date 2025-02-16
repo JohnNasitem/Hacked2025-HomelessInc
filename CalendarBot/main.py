@@ -52,9 +52,6 @@ async def printer(interaction: discord.Interaction, printer: str, num: int):
     #respond to where-ever the slash prompt was sent
     await interaction.response.send_message(f'{printer} {num}')
 
-
-
-
 # example of making a /command that has buttons
 class View(discord.ui.View):
     @discord.ui.button(label="Add", style=discord.ButtonStyle.green, emoji="✍️")
@@ -76,7 +73,7 @@ async def myButton(interaction: discord.Interaction):
     await interaction.response.send_message(view=View())
 
 #-------------------------------------------------------------------------------------------
-# I assumed you had to make a separate class for more buttons but i could be wrong
+# I assumed you had to make a separate class for buttons on a diff command but i could be wrong
 class View_2(discord.ui.View):
     @discord.ui.button(label="ahhhhhh", style=discord.ButtonStyle.blurple, emoji="🤡")
     async def button_callback(self, button, interaction):
