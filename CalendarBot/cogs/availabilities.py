@@ -14,9 +14,9 @@ cursor = database.cursor()
 database.execute("DROP TABLE IF EXISTS availability")
 database.execute("""CREATE TABLE IF NOT EXISTS availability(
                  USERID INTEGER,
-                 AVAILABILITYDATE DATE
-                 StartTime STRING,
-                 EndTime STRING,
+                 AVAILABILITYDATE TEXT
+                 StartTime TEXT,
+                 EndTime TEXT,
                  RECURRING TEXT
                  )""")
 
