@@ -2,7 +2,6 @@ import datetime
 import discord
 import re
 import random
-from enum import Enum
 from discord.ext import commands
 from discord import app_commands
 from PIL import Image, ImageDraw, ImageFont
@@ -69,15 +68,6 @@ week = [
     Day(5, "Sunday", "8:00 am", "11:00 am"),
 ]
 
-class Repeating(Enum):
-    """
-    Enum class for repeating availability
-    """
-    DAILY = 1
-    WEEKLY = 2
-    MONTHLY = 3
-
-
 class Availability(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -103,7 +93,13 @@ class Availability(commands.Cog):
             return False
         
     @app_commands.command(name="set-availability", description="Set your availability for a specific time period")
-    async def setAvailability(self, interaction: discord.Interaction, start: str, end: str, repeating: Repeating):
+    @app_commands.describe(repeating="Choose how often this availability repeats")
+    @app_commands.choices(repeating=[
+        discord.app_commands.Choice(name="Daily", value="daily"),
+        discord.app_commands.Choice(name="Weekly", value="weekly"),
+        discord.app_commands.Choice(name="Monthly", value="monthly")
+    ])
+    async def setAvailability(self, interaction: discord.Interaction, start: str, end: str, repeating: str):
         """
         Set the availability for a specific time period
 
