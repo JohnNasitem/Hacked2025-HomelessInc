@@ -1,15 +1,17 @@
 import datetime
 import discord
+import re
+import random
+from enum import Enum
 from discord.ext import commands
 from discord import app_commands
 from PIL import Image, ImageDraw, ImageFont
-import re
-import random
 
 col_header_font = ImageFont.truetype("arial.ttf", 50)
 row_header_font = ImageFont.truetype("arial.ttf", 30)
 days_of_week = [ "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 time_regex_string = r"(\d\d?):(\d\d) (am|pm)"
+
 
 class Day:
     """
@@ -67,6 +69,14 @@ week = [
     Day(5, "Sunday", "8:00 am", "11:00 am"),
 ]
 
+class Repeating(Enum):
+    """
+    Enum class for repeating availability
+    """
+    DAILY = 1
+    WEEKLY = 2
+    MONTHLY = 3
+
 
 class Availability(commands.Cog):
     def __init__(self, bot):
@@ -78,28 +88,28 @@ class Availability(commands.Cog):
 
     def _correctFormat(self, date_time):
         """
-        Check if date_time is in the following format:
+        Check if date_time is in the following formats:
         YYYY-MM-DD HH:MM
 
         Returns:
             True if data_time is in the correct format
             False otherwise
         """
-        format = "%Y-%m-%d %H:%M"
+        date_time_format = "%Y-%m-%d %H:%M"
         try:
-            datetime.datetime.strptime(date_time, format)
+            datetime.datetime.strptime(date_time, date_time_format)
             return True
         except ValueError:
             return False
         
     @app_commands.command(name="set-availability", description="Set your availability for a specific time period")
-    async def setAvailability(self, interaction: discord.Interaction, start: str, end: str, repeating: bool):
+    async def setAvailability(self, interaction: discord.Interaction, start: str, end: str, repeating: Repeating):
         """
         Set the availability for a specific time period
 
         Returns:
             (userID, start date_time, end date_time, repeating) if the message is in the correct format
-            -1 otherwise
+            None otherwise
 
         shouts out to chris for getting slash commands to work
         """
@@ -107,13 +117,15 @@ class Availability(commands.Cog):
             if not self._correctFormat(start) or not self._correctFormat(end):  # verify if start and end correctly formatted
                 raise Exception("Invalid date_time format.")
             
+            print(f"Repeating: \"{repeating}\"")
+            
             await interaction.response.send_message(f"Set availability for <@{interaction.user.id}> from {start} to {end} repeating: {repeating}")
             await interaction.response.send_message(f"userID: {interaction.user.id} Start: {start}, End: {end}, Repeating: {repeating}")  # test command remove later
-            return (interaction.user.id, start, end, repeating)
+            return interaction.user.id, start, end, repeating
         
         except Exception as exception:
             await interaction.response.send_message(f"{exception} Please provide the date_time in the following format: YYYY-MM-DD HH:MM")
-            return -1
+            return None
 
 
 async def setup(bot):
