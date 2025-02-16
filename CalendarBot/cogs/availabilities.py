@@ -11,7 +11,7 @@ class Availability(commands.Cog):
 
     #replace with availability commands
     @commands.command()
-    async def ping(self, ctx):
+    async def cmd(self, ctx):
         await ctx.send("Pong!!")
 
 async def setup(bot):
