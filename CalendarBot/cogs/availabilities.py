@@ -6,6 +6,19 @@ from discord.ext import commands
 from discord import app_commands
 from PIL import Image, ImageDraw, ImageFont
 import os
+import sqlite3
+from datetime import datetime
+
+database = sqlite3.connect("database.db")
+cursor = database.cursor()
+database.execute("DROP TABLE IF EXISTS availability")
+database.execute("""CREATE TABLE IF NOT EXISTS availability(
+                 USERID INTEGER, 
+                 StartTime DATETIME,
+                 EndTime DATETIME,
+                 RECURRING TEXT
+                 )""")
+
 
 col_header_font = ImageFont.truetype("arial.ttf", 50)
 row_header_font = ImageFont.truetype("arial.ttf", 30)
@@ -76,7 +89,7 @@ class Availability(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        print("Bot is online!")
+        print("Availability is ready!")
 
     @staticmethod
     def _correctFormat(date_time):
@@ -90,18 +103,34 @@ class Availability(commands.Cog):
         """
         date_time_format = "%Y-%m-%d %H:%M"
         try:
-            datetime.datetime.strptime(date_time, date_time_format)
+            datetime.strptime(date_time, date_time_format)
             return True
         except ValueError:
             return False
-        
+
+    @staticmethod
+    def convert_row_to_day(row):
+        """
+        Convert a row from the availability table to a day instance
+        :param row:
+        :return:
+        """
+        dt_start = datetime.strptime(row[1], '%Y-%m-%d %H:%M')
+        dt_end = datetime.strptime(row[2], '%Y-%m-%d %H:%M')
+        new_day_user_id = row[0]
+        new_day_day_of_week = dt_start.strftime('%A')  # '%A' gives the full weekday name
+        new_day_start_time = dt_start.strftime("%I:%M %p")
+        new_day_end_time = dt_end.strftime("%I:%M %p")
+        return Day(new_day_user_id, new_day_day_of_week, new_day_start_time, new_day_end_time)
+
     @app_commands.command(name="set-availability", description="Set your availability for a specific time period")
     @app_commands.describe(repeating="Choose how often this availability repeats")
     @app_commands.choices(repeating=[
         discord.app_commands.Choice(name="Does not repeat", value="false"),
         discord.app_commands.Choice(name="Daily", value="daily"),
         discord.app_commands.Choice(name="Weekly", value="weekly"),
-        discord.app_commands.Choice(name="Monthly", value="monthly")
+        discord.app_commands.Choice(name="Monthly", value="monthly"),
+        discord.app_commands.Choice(name="Yearly", value="yearly")
     ])
     async def setAvailability(self, interaction: discord.Interaction, start: str, end: str, repeating: str):
         """
@@ -117,15 +146,28 @@ class Availability(commands.Cog):
             if not self._correctFormat(start) or not self._correctFormat(end):  # verify if start and end correctly formatted
                 raise Exception("Invalid date_time format.")
             
-            print(f"Repeating: \"{repeating}\"")
-            
-            await interaction.response.send_message(f"Set availability for <@{interaction.user.id}> from {start} to {end} repeating: {repeating}" + 
-                                                    f"\nuserID: {interaction.user.id} Start: {start}, End: {end}, Repeating: {repeating}")
-            return interaction.user.id, start, end, repeating
+            await interaction.response.send_message(f"Set availability for <@{interaction.user.id}> from {start} to {end} repeating: {repeating}")
+
+            #return interaction.user.id, start, end, repeating
+            add_availability(interaction.user.id, start, end, repeating)
+            add_availability(interaction.user.id, start, end, "false")
         
         except Exception as exception:
             await interaction.response.send_message(f"{exception} Please provide the date_time in the following format: YYYY-MM-DD HH:MM")
             return None
+
+    @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
+    async def getAvailability(self, interaction: discord.Interaction, user: discord.User):
+        try:
+            week_test = []
+            for result in get_availability(user.id):
+                week_test.append(Availability.convert_row_to_day(result))
+            #await interaction.response.send_message(f"Availability for <@{user.id}>\n{output}")
+            await create_image(self.bot, week_test)
+            with open('generated_images/schedule.png', 'rb') as f:
+                await interaction.response.send_message("Here is your image!", file=discord.File(f))
+        except Exception as ex:
+            await interaction.response.send_message(f"Something went wrong:\n{ex}")
         
     @commands.command()
     async def image(self, ctx):
@@ -144,6 +186,7 @@ async def create_image(bot, week_data, show_overlap_count = True):
     Create an image using a list of days, legend will be included if more than one user id exists in the list.
     :param week_data: list holding instances of Day
     """
+
     def generate_colour_table(user_ids):
         """
         Populate a colour dictionary with random colours
@@ -207,6 +250,7 @@ async def create_image(bot, week_data, show_overlap_count = True):
         :param time_string: time string in the format of 8:30 am
         :return: index of that string
         """
+        time_string = time_string.lower()
         time_match = re.match(time_regex_string, time_string)
         time_i = 0 if time_match.group(3) == "am" else 24
         time_i += (int(time_match.group(1)) % 12) * 2
@@ -221,7 +265,7 @@ async def create_image(bot, week_data, show_overlap_count = True):
 
     # Get colour table
     colour_table = generate_colour_table(unique_ids)
-    image_size = background_width if len(colour_table) == 1 else background_width + 400, 2500
+    image_size = background_width if len(colour_table) < 2 else background_width + 400, 2500
     # Generates the white background
     background = Image.new('RGBA', image_size, color=(255, 255, 255, 255))
     # Sets drawing canvas to the background
@@ -252,8 +296,16 @@ async def create_image(bot, week_data, show_overlap_count = True):
         for y in range(background.height):
             pixels[200 + (colIndex * 300), y] = (0, 0, 0)
 
+    # Save empty schedule if no week data exists
+    if not week_data:
+        # Ensure folder exists
+        os.makedirs('generated_images', exist_ok=True)
+        # Save and show the result
+        background.save('generated_images/schedule.png')
+        return
+
     # Add a rectangle for each slot
-    for day in week:
+    for day in week_data:
         # Create a new overlay for the rectangle
         overlay = Image.new('RGBA', image_size, color=(255, 255, 255, 0))
         draw = ImageDraw.Draw(overlay)
@@ -300,8 +352,30 @@ async def create_image(bot, week_data, show_overlap_count = True):
         # Composite this overlay onto the background
         background = Image.alpha_composite(background, overlay)
 
-    output_folder = 'generated_images'
     # Ensure folder exists
-    os.makedirs(output_folder, exist_ok=True)
+    os.makedirs('generated_images', exist_ok=True)
     # Save and show the result
     background.save('generated_images/schedule.png')
+
+def add_availability(user_id, start_date_time, end_date_time, recurring):
+    """
+    Add availability to database
+    :param user_id: user id of the availability
+    :param start_date_time: start time
+    :param end_date_time: end time
+    :param recurring: false, daily, weekly, monthly, yearly
+    :return: none
+    """
+    query = "INSERT INTO availability VALUES (?, ?, ?, ?)"
+    cursor.execute(query, (user_id, start_date_time, end_date_time, recurring))
+    database.commit()
+
+def get_availability(user_id):
+    """
+    Get all the availabilities set for that user id.
+    :param user_id: user id to get availabilities for
+    :return: all the related availabilities
+    """
+    query = "SELECT * FROM availability WHERE USERID = ?"
+    cursor.execute(query, (user_id,))
+    return cursor.fetchall()
