@@ -25,47 +25,47 @@ class Day:
 #harded coded text values
 week = [
     # ID 1 (Person 1)
-    Day(1, "Monday", "8:00 am", "12:00 pm"),
-    Day(1, "Monday", "1:00 pm", "4:00 pm"),
-    Day(1, "Tuesday", "9:00 am", "12:00 pm"),
-    Day(1, "Wednesday", "7:30 am", "11:30 am"),
-    Day(1, "Thursday", "10:00 am", "2:00 pm"),
-    Day(1, "Friday", "8:30 am", "12:30 pm"),
-    Day(1, "Saturday", "9:00 am", "11:30 am"),
-    Day(1, "Sunday", "10:00 am", "12:30 pm"),
+    Day(357657793215332357, "Monday", "8:00 am", "12:00 pm"),
+    Day(357657793215332357, "Monday", "1:00 pm", "4:00 pm"),
+    Day(357657793215332357, "Tuesday", "9:00 am", "12:00 pm"),
+    Day(357657793215332357, "Wednesday", "7:30 am", "11:30 am"),
+    Day(357657793215332357, "Thursday", "10:00 am", "2:00 pm"),
+    Day(357657793215332357, "Friday", "8:30 am", "12:30 pm"),
+    Day(357657793215332357, "Saturday", "9:00 am", "11:30 am"),
+    Day(357657793215332357, "Sunday", "10:00 am", "12:30 pm"),
 
     # ID 2 (Person 2)
-    Day(2, "Monday", "7:00 am", "11:00 am"),
-    Day(2, "Monday", "12:00 pm", "4:00 pm"),
-    Day(2, "Tuesday", "8:00 am", "12:00 pm"),
-    Day(2, "Wednesday", "6:30 am", "10:30 am"),
-    Day(2, "Thursday", "9:00 am", "1:00 pm"),
-    Day(2, "Friday", "8:00 am", "12:00 pm"),
-    Day(2, "Saturday", "7:30 am", "11:30 am"),
-    Day(2, "Sunday", "9:00 am", "12:00 pm"),
+    Day(799817805099827200, "Monday", "7:00 am", "11:00 am"),
+    Day(799817805099827200, "Monday", "12:00 pm", "4:00 pm"),
+    Day(799817805099827200, "Tuesday", "8:00 am", "12:00 pm"),
+    Day(799817805099827200, "Wednesday", "6:30 am", "10:30 am"),
+    Day(799817805099827200, "Thursday", "9:00 am", "1:00 pm"),
+    Day(799817805099827200, "Friday", "8:00 am", "12:00 pm"),
+    Day(799817805099827200, "Saturday", "7:30 am", "11:30 am"),
+    Day(799817805099827200, "Sunday", "9:00 am", "12:00 pm"),
 
     # ID 3 (Person 3)
-    Day(3, "Monday", "8:00 am", "12:00 pm"),
-    Day(3, "Wednesday", "9:00 am", "1:00 pm"),
-    Day(3, "Thursday", "2:00 pm", "5:00 pm"),
-    Day(3, "Friday", "10:00 am", "1:00 pm"),
-    Day(3, "Saturday", "2:30 pm", "5:30 pm"),
-    Day(3, "Sunday", "12:00 pm", "4:00 pm"),
+    Day(183651970526085120, "Monday", "8:00 am", "12:00 pm"),
+    Day(183651970526085120, "Wednesday", "9:00 am", "1:00 pm"),
+    Day(183651970526085120, "Thursday", "2:00 pm", "5:00 pm"),
+    Day(183651970526085120, "Friday", "10:00 am", "1:00 pm"),
+    Day(183651970526085120, "Saturday", "2:30 pm", "5:30 pm"),
+    Day(183651970526085120, "Sunday", "12:00 pm", "4:00 pm"),
 
     # ID 4 (Person 4)
-    Day(4, "Tuesday", "10:00 am", "1:00 pm"),
-    Day(4, "Thursday", "11:00 am", "2:00 pm"),
-    Day(4, "Friday", "9:30 am", "12:30 pm"),
-    Day(4, "Saturday", "3:00 pm", "6:00 pm"),
-    Day(4, "Sunday", "10:00 am", "12:30 pm"),
+    Day(401501356327698434, "Tuesday", "10:00 am", "1:00 pm"),
+    Day(401501356327698434, "Thursday", "11:00 am", "2:00 pm"),
+    Day(401501356327698434, "Friday", "9:30 am", "12:30 pm"),
+    Day(401501356327698434, "Saturday", "3:00 pm", "6:00 pm"),
+    Day(401501356327698434, "Sunday", "10:00 am", "12:30 pm"),
 
     # ID 5 (Person 5)
-    Day(5, "Monday", "9:00 am", "1:00 pm"),
-    Day(5, "Wednesday", "2:00 pm", "5:00 pm"),
-    Day(5, "Thursday", "8:00 am", "12:00 pm"),
-    Day(5, "Friday", "11:30 am", "2:30 pm"),
-    Day(5, "Saturday", "1:00 pm", "4:00 pm"),
-    Day(5, "Sunday", "8:00 am", "11:00 am"),
+    Day(381874990783528960, "Monday", "9:00 am", "1:00 pm"),
+    Day(381874990783528960, "Wednesday", "2:00 pm", "5:00 pm"),
+    Day(381874990783528960, "Thursday", "8:00 am", "12:00 pm"),
+    Day(381874990783528960, "Friday", "11:30 am", "2:30 pm"),
+    Day(381874990783528960, "Saturday", "1:00 pm", "4:00 pm"),
+    Day(381874990783528960, "Sunday", "8:00 am", "11:00 am"),
 ]
 
 class Availability(commands.Cog):
@@ -126,7 +126,7 @@ class Availability(commands.Cog):
     @commands.command()
     async def image(self, ctx):
         try:
-            create_image(week, True)
+            await create_image(self.bot, week)
             with open('generated_images/schedule.png', 'rb') as f:
                 await ctx.send("Here is your image!", file=discord.File(f))
         except Exception as e:
@@ -135,8 +135,7 @@ class Availability(commands.Cog):
 async def setup(bot):
     await bot.add_cog(Availability(bot))
 
-# TODO: Add legend for each color in the color table, dont show if only 1 person is being viewed (or not :shrug:)
-def create_image(week_data, show_overlap_count):
+async def create_image(bot, week_data, show_overlap_count = True):
     """
     Create an image using a list of days, legend will be included if more than one user id exists in the list.
     :param week_data: list holding instances of Day
@@ -148,15 +147,30 @@ def create_image(week_data, show_overlap_count):
         :return: Color Dictionary (user_id: color)
         """
 
+        # def generate_light_color():
+        #     """
+        #     Generate light colours
+        #     :return: r, g, b values
+        #     """
+        #     r_int = random.randint(180, 255)
+        #     g_int = random.randint(180, 255)
+        #     b_int = random.randint(180, 255)
+        #     return r_int, g_int, b_int
+
         def generate_light_color():
             """
-            Generate light colours
+            Generate a light color, avoiding brown or gray shades.
             :return: r, g, b values
             """
-            r = random.randint(180, 255)
-            g = random.randint(180, 255)
-            b = random.randint(180, 255)
-            return r, g, b
+            while True:
+                r_int = random.randint(180, 255)
+                g_int = random.randint(180, 255)
+                b_int = random.randint(180, 255)
+
+                # Avoid colors with too similar RGB values (to skip gray-like tones)
+                # Avoid brownish hues by ensuring no dominant mix of red and green
+                if abs(r_int - g_int) > 30 or abs(r_int - b_int) > 30 or abs(g_int - b_int) > 30 and not (r_int > 200 and 210 < g_int > 150 and b_int < 100):
+                    return r_int, g_int, b_int
 
         colour_dict = {}
         incr = 0
@@ -195,10 +209,17 @@ def create_image(week_data, show_overlap_count):
         time_i += 0 if time_match.group(2) == "00" else 1
         return time_i
 
+    background_width = 2300
+
+    # Get unique ids and count
+    unique_ids = get_unique_ids()
+    unique_id_count = len(unique_ids)
+
     # Get colour table
-    colour_table = generate_colour_table(get_unique_ids())
+    colour_table = generate_colour_table(unique_ids)
+    image_size = background_width if len(colour_table) == 1 else background_width + 400, 2500
     # Generates the white background
-    background = Image.new('RGBA', (2300, 2500), color=(255, 255, 255, 255))
+    background = Image.new('RGBA', image_size, color=(255, 255, 255, 255))
     # Sets drawing canvas to the background
     draw = ImageDraw.Draw(background)
     # Load pixels for line drawing
@@ -215,7 +236,7 @@ def create_image(week_data, show_overlap_count):
         draw.text((100, 135 + (rowIndex * 50)), text, font=row_header_font, fill=(0, 0, 0), anchor="ms")
 
         # Add horizontal line
-        for x in range(background.width):
+        for x in range(background_width):
             pixels[x, 100 + (rowIndex * 50)] = (0, 0, 0)
 
     # Populate column headers and draw vertical lines
@@ -230,7 +251,7 @@ def create_image(week_data, show_overlap_count):
     # Add a rectangle for each slot
     for day in week:
         # Create a new overlay for the rectangle
-        overlay = Image.new('RGBA', (2300, 2500), color=(255, 255, 255, 0))
+        overlay = Image.new('RGBA', image_size, color=(255, 255, 255, 0))
         draw = ImageDraw.Draw(overlay)
 
         # Convert start and end times to y positions
@@ -247,14 +268,37 @@ def create_image(week_data, show_overlap_count):
         background = Image.alpha_composite(background, overlay)
 
     # Display the number of overlaps in each cell
-    if show_overlap_count:
+    if show_overlap_count and unique_id_count > 1:
         draw = ImageDraw.Draw(background)
+        # Nested loop to iterate through each cell
         for colIndex, day_in_week in enumerate(days_of_week):
             for time_index in range(48):
                 count = len([time_slot for time_slot in week if get_time_index(time_slot.start_time) <= time_index < get_time_index(time_slot.end_time) and time_slot.weekday == day_in_week])
                 if count != 0:
                     draw.text((350 + (colIndex * 300), 135 + (time_index * 50)), str(count), font=row_header_font, fill=(0, 0, 0), anchor="ms")
 
+    # Show legend if more than 1 person is being displayed
+    if unique_id_count > 1:
+        # Add another vertical line separating the legend
+        pixels = background.load()
+        for y in range(background.height):
+            pixels[200 + (len(days_of_week * 300)), y] = (0, 0, 0)
+
+        #Add legend
+        overlay = Image.new('RGBA', image_size, color=(255, 255, 255, 0))
+        draw = ImageDraw.Draw(overlay)
+        for user_id_index, user_id in enumerate(unique_ids):
+            user = await bot.fetch_user(user_id)
+            # Back color
+            draw.rectangle([(background_width, user_id_index * 50), (background_width + 400, 50 + (user_id_index * 50))], fill=colour_table[user_id])
+            draw.text((background_width + 200, 35 + (user_id_index * 50)), user.display_name, font=row_header_font, fill=(0,0,0), anchor="ms")
+
+        # Composite this overlay onto the background
+        background = Image.alpha_composite(background, overlay)
+
+    output_folder = 'generated_images'
+    # Ensure folder exists
+    os.makedirs(output_folder, exist_ok=True)
     # Save and show the result
     background.save('generated_images/schedule.png')
 
