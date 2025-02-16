@@ -6,3 +6,4 @@ DiscordBot/.env
 CalendarBot/.env
 /CalendarBot/.idea
 /CalendarBot/cogs/__pycache__
+/CalendarBot/generated_images
