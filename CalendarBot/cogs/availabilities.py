@@ -73,6 +73,10 @@ class Availability(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    @commands.Cog.listener()
+    async def on_ready(self):
+        print("Bot is online!")
+
     def _correctFormat(self, date_time):
         """
         Check if date_time is in the following format:
@@ -88,10 +92,6 @@ class Availability(commands.Cog):
             return True
         except ValueError:
             return False
-
-    @commands.Cog.listener()
-    async def on_ready(self):
-        print("Bot is online!")
         
     @app_commands.command(name="set-availability", description="Set your availability for a specific time period")
     async def setAvailability(self, interaction: discord.Interaction, start: str, end: str, repeating: bool):
