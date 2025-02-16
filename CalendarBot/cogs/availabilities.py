@@ -104,13 +104,22 @@ class Availability(commands.Cog):
             False otherwise
         """
         date_format = "%Y-%m-%d" 
-        time_format = "%H:%M %p"
+        time_format = "%I:%M %p"
         try:
             datetime.strptime(date, date_format)
             datetime.strptime(time, time_format)
             return True
         except ValueError:
             return False
+        
+    @staticmethod
+    def _convertToUnix(date, time):
+        """
+        Convert date and time to a Unix timestamp
+        """
+        date_time = datetime.strptime(f"{date, time}", "%Y-%m-%d %I:%M %p")
+        return datetime.timestamp()
+
 
     @staticmethod
     def convert_row_to_day(row):
@@ -146,15 +155,15 @@ class Availability(commands.Cog):
         try:
             if not self._correctDateTimeFormat(day, start_time) or not self._correctDateTimeFormat(day, end_time):  # verify if start and end correctly formatted
                 raise Exception("Invalid date_time format.")
-            
-            await interaction.response.send_message(f"Set availability for <@{interaction.user.id}> on ```{day}``` from ```{start_time}``` to ```{end_time}``` repeating: {repeating}")
+
+            await interaction.response.send_message(f"Set availability for <@{interaction.user.id}> on <t:{datetime.timestamp(day)}> from ```{self._convert}``` to ```{end_time}``` repeating: {repeating}")
 
             #return interaction.user.id, start, end, repeating
             add_availability(interaction.user.id, day, start_time, end_time, repeating)
             add_availability(interaction.user.id, day, start_time, end_time, "false")
         
         except Exception as exception:
-            await interaction.response.send_message(f"{exception} Please provide the times in the following format: YYYY-MM-DD HH:MM (24-hour)")
+            await interaction.response.send_message(f"{exception} Please provide the times in the following format: YYYY-MM-DD HH:MM (12-hour)")
             return None
 
     @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
