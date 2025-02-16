@@ -68,7 +68,6 @@ week = [
 ]
 
 
-
 class Availability(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -108,6 +107,7 @@ class Availability(commands.Cog):
             if not self._correctFormat(start) or not self._correctFormat(end):  # verify if start and end correctly formatted
                 raise Exception("Invalid date_time format.")
             
+            await interaction.response.send_message(f"Set availability for <@{interaction.user.id}> from {start} to {end} repeating: {repeating}")
             await interaction.response.send_message(f"userID: {interaction.user.id} Start: {start}, End: {end}, Repeating: {repeating}")  # test command remove later
             return (interaction.user.id, start, end, repeating)
         
