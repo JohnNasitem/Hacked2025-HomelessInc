@@ -5,10 +5,6 @@ import os
 from dotenv import load_dotenv
 import asyncio
 
-#stuff to initialize in main ig 
-load_dotenv()
-
-
 class Client(commands.Bot):
     async def on_ready(self):
         print(f'Logged on as {self.user}!')
@@ -32,6 +28,8 @@ class Client(commands.Bot):
     async def on_reaction_add(self,reaction,user):
         await reaction.message.channel.send('you reacted')
 
+#stuff to initialize in main ig 
+load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 intents = discord.Intents.default()
 intents.message_content = True
@@ -42,20 +40,19 @@ client = Client(command_prefix="!", intents=intents)
 #1340369941001539636 -> hackathon serverid
 Guild_ID = discord.Object(id=1340369941001539636)
 
-#how to create a slash command, specify name and description, and guild (pretty much server specific obj)
+#how to create a slash command, specify name and description, and guild (pretty much server as an obj)
 
 @client.tree.command(name="hello", description = "say hello", guild=Guild_ID)
 async def sayHello(interaction: discord.Interaction):
     #respond to where-ever the slash prompt was sent
     await interaction.response.send_message("hello")
 
-
-
 # example of slash command where you have the user passing info into command
 @client.tree.command(name="printer", description = "prints whatever you give it", guild=Guild_ID)
-async def sayHello(interaction: discord.Interaction, printer: str, num: int):
+async def printer(interaction: discord.Interaction, printer: str, num: int):
     #respond to where-ever the slash prompt was sent
-    await interaction.response.send_message(printer, num)
+    await interaction.response.send_message(f'{printer} {num}')
+    
 
 
 
