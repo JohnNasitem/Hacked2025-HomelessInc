@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 
 class Event(commands.Cog):
     def __init__(self, bot):
@@ -9,7 +10,6 @@ class Event(commands.Cog):
     async def on_ready(self):
         print("Bot is online!")
 
-    #replace with events commands
     @commands.command()
     async def cmd(self, ctx):
         await ctx.send("Pong!!")

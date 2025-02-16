@@ -1,8 +1,8 @@
 import datetime
 import discord
 from discord.ext import commands
+from discord import app_commands
 from PIL import Image, ImageDraw, ImageFont
-
 
 class Availability(commands.Cog):
     def __init__(self, bot):
@@ -27,16 +27,6 @@ class Availability(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print("Bot is online!")
-
-    # replace with availability commands
-    @commands.command()
-    async def image(self, ctx):
-        img = Image.new('RGB', (200, 100), color = (255, 0, 0))
-        draw = ImageDraw.Draw(img)
-        img.save('generated_images/test.png')
-
-        with open('generated_images/test.png', 'rb') as f:
-            await ctx.send("Here is your image!",file=discord.File(f))
 
     @commands.command(name="sa")
     async def specificAvailability(self, ctx):
@@ -70,16 +60,13 @@ class Availability(commands.Cog):
             await ctx.send(f"{exception} Please provide the date_time in the following format: YYYY-MM-DD HH:MM")
             return -1
         
-    @commands.command(name="test")
-    async def test(self, ctx):
-        content = ctx.message.content
-        content_no_command = content.replace(f"!{ctx.command.name}", "").strip()
-        await ctx.send(f"{content_no_command}")
+    @app_commands.command(name="set-availability", description="Set your availability for a specific time period")
+    async def setAvailability(self, interaction: discord.Interaction, start: str, end: str):
+        """
+            
+        """
+        await interaction.response.send_message("Test")
 
-    @commands.command(name="dayavailability")
-    async def dayAvailability(self, ctx):
-        pass
-    
 
 async def setup(bot):
     await bot.add_cog(Availability(bot))

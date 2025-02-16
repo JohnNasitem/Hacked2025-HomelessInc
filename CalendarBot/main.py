@@ -11,8 +11,17 @@ class Client(commands.Bot):
     async def on_ready(self):
         print(f'Logged in as {self.user}')
 
+        # sync slash commands
+        try:
+            guildID = discord.Object(id=1340369941001539636)
+            synced_commands = await bot.tree.sync()
+            print(f"Synced {len(synced_commands)} commands")
+        except Exception as e:
+            print(f"Failed to sync commands: {e}")
+
+
 TOKEN = os.getenv("BOT_TOKEN")
-intents = discord.Intents.default()
+intents = discord.Intents.all()
 intents.message_content = True  # Enable message content intent
 bot = Client(command_prefix="!", intents=intents)
 
