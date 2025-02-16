@@ -158,9 +158,7 @@ class Availability(commands.Cog):
 
             await interaction.response.send_message(f"Set availability for <@{interaction.user.id}> on <t:{datetime.timestamp(day)}> from ```{self._convert}``` to ```{end_time}``` repeating: {repeating}")
 
-            #return interaction.user.id, start, end, repeating
             add_availability(interaction.user.id, day, start_time, end_time, repeating)
-            add_availability(interaction.user.id, day, start_time, end_time, "false")
         
         except Exception as exception:
             await interaction.response.send_message(f"{exception} Please provide the times in the following format: YYYY-MM-DD HH:MM (12-hour)")
@@ -170,12 +168,12 @@ class Availability(commands.Cog):
     async def getAvailability(self, interaction: discord.Interaction, user: discord.User):
         try:
             week_test = []
-            for result in get_availability(user.id):
+            results = get_availability(user.id)
+            for result in results:
                 week_test.append(Availability.convert_row_to_day(result))
-            #await interaction.response.send_message(f"Availability for <@{user.id}>\n{output}")
             await create_image(self.bot, week_test)
             with open('generated_images/schedule.png', 'rb') as f:
-                await interaction.response.send_message("Here is your image!", file=discord.File(f))
+                await interaction.response.send_message(f"Availability for <@{user.id}>", file=discord.File(f))
         except Exception as ex:
             await interaction.response.send_message(f"Something went wrong:\n{ex}")
         
@@ -369,7 +367,7 @@ async def create_image(bot, week_data, show_overlap_count = True):
     # Save and show the result
     background.save('generated_images/schedule.png')
 
-def add_availability(user_id, start_date_time, end_date_time, recurring):
+def add_availability(user_id, date, start_date_time, end_date_time, recurring):
     """
     Add availability to database
     :param user_id: user id of the availability
@@ -378,8 +376,8 @@ def add_availability(user_id, start_date_time, end_date_time, recurring):
     :param recurring: false, daily, weekly, monthly, yearly
     :return: none
     """
-    query = "INSERT INTO availability VALUES (?, ?, ?, ?)"
-    cursor.execute(query, (user_id, start_date_time, end_date_time, recurring))
+    query = "INSERT INTO availability VALUES (?, ?, ?, ?, ?)"
+    cursor.execute(query, (user_id, date, start_date_time, end_date_time, recurring))
     database.commit()
 
 def get_availability(user_id):
