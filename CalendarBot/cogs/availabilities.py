@@ -92,18 +92,21 @@ class Availability(commands.Cog):
         print("Availability is ready!")
 
     @staticmethod
-    def _correctFormat(date_time):
+    def _correctDateTimeFormat(date, time):
         """
-        Check if date_time is in the following formats:
-        YYYY-MM-DD HH:MM
+        Check if date and time is in the following formats respectivel:
+        YYYY-MM-DD 
+        HH:MM
 
         Returns:
-            True if data_time is in the correct format
+            True if both are in the correct format
             False otherwise
         """
-        date_time_format = "%Y-%m-%d %H:%M"
+        date_format = "%Y-%m-%d" 
+        time_format = "%H:%M %p"
         try:
-            datetime.strptime(date_time, date_time_format)
+            datetime.strptime(date, date_format)
+            datetime.strptime(time, time_format)
             return True
         except ValueError:
             return False
@@ -132,28 +135,28 @@ class Availability(commands.Cog):
         discord.app_commands.Choice(name="Monthly", value="monthly"),
         discord.app_commands.Choice(name="Yearly", value="yearly")
     ])
-    async def setAvailability(self, interaction: discord.Interaction, start: str, end: str, repeating: str):
+    async def setAvailability(self, interaction: discord.Interaction, day: str, start_time: str, end_time: str, repeating: str):
         """
         Set the availability for a specific time period
 
         Returns:
-            (userID, start date_time, end date_time, repeating) if the message is in the correct format
+            (userID, day, start_time, end_time) if the message is in the correct format
             None otherwise
 
         shouts out to chris for getting slash commands to work
         """
         try:
-            if not self._correctFormat(start) or not self._correctFormat(end):  # verify if start and end correctly formatted
+            if not self._correctDateTimeFormat(day, start_time) or not self._correctDateTimeFormat(day, end_time):  # verify if start and end correctly formatted
                 raise Exception("Invalid date_time format.")
             
-            await interaction.response.send_message(f"Set availability for <@{interaction.user.id}> from {start} to {end} repeating: {repeating}")
+            await interaction.response.send_message(f"Set availability for <@{interaction.user.id}> on ```{day}``` from ```{start_time}``` to ```{end_time}``` repeating: {repeating}")
 
             #return interaction.user.id, start, end, repeating
-            add_availability(interaction.user.id, start, end, repeating)
-            add_availability(interaction.user.id, start, end, "false")
+            add_availability(interaction.user.id, day, start_time, end_time, repeating)
+            add_availability(interaction.user.id, day, start_time, end_time, "false")
         
         except Exception as exception:
-            await interaction.response.send_message(f"{exception} Please provide the date_time in the following format: YYYY-MM-DD HH:MM")
+            await interaction.response.send_message(f"{exception} Please provide the times in the following format: YYYY-MM-DD HH:MM (24-hour)")
             return None
 
     @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
