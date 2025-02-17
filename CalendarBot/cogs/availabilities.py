@@ -165,7 +165,7 @@ class Availability(commands.Cog):
 
             # If argument is left empty then default ot calling user
             if user_str == "":
-                users.append(interaction.user.id)
+                users.append(interaction.user)
             else:
                 # Find all numbers in argument
                 user_id_match = re.findall(r'\d+', user_str)
@@ -178,11 +178,14 @@ class Availability(commands.Cog):
                     except discord.NotFound:
                         print(f'{possible_id} is an invalid user id')
 
-            # If users remains empty then that means everyone should be considered
-
             week_test = []
-            for t_user in users:
-                for result in get_availability(t_user.id):
+            if users:
+                for t_user in users:
+                    for result in get_availability(t_user.id):
+                        week_test.append(Availability.convert_row_to_day(result))
+            # If users is empty then that means everyone should be considered
+            else:
+                for result in get_all_availabilities():
                     week_test.append(Availability.convert_row_to_day(result))
 
             await create_image(self.bot, week_data)
