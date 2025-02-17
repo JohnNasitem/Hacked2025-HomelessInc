@@ -22,14 +22,7 @@ class Database(commands.Cog):
         status = "Attempting to reset tables..."
 
         try:
-            database.execute("DROP TABLE IF EXISTS availability")
-            database.execute("""CREATE TABLE IF NOT EXISTS availability(
-                             USERID INTEGER,
-                             AVAILABILITYDATE TEXT,
-                             StartTime TEXT,
-                             EndTime TEXT,
-                             RECURRING TEXT
-                             )""")
+            reset_availability()
 
             status += "\nReset the availability table"
 
@@ -67,3 +60,16 @@ class Database(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(Database(bot))
+
+def reset_availability():
+    """
+    Reset availability table
+    """
+    database.execute("DROP TABLE IF EXISTS availability")
+    database.execute("""CREATE TABLE IF NOT EXISTS availability(
+                                 USERID INTEGER,
+                                 AVAILABILITYDATE TEXT,
+                                 StartTime TEXT,
+                                 EndTime TEXT,
+                                 RECURRING TEXT
+                                 )""")
