@@ -16,7 +16,8 @@ class Database(commands.Cog):
     @commands.command()
     async def reset_database(self, ctx):
         # Setting it to only work for Eatdatpizza for now
-        if ctx.user.id != 357657793215332357:
+        print(ctx.author)
+        if ctx.author.id != 357657793215332357:
             return
 
         database.execute("DROP TABLE IF EXISTS availability")
