@@ -251,19 +251,20 @@ class Availability(commands.Cog):
         await interaction.response.send_modal(CreateAvailabilityModal())
 
     @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
-    async def get_availability(self, interaction: discord.Interaction, user_str: str = "", week_num: int = -1):
+    async def get_availability(self, interaction: discord.Interaction, users: str = "", week_num: int = -1, show_overlap_numbers: bool = True):
         """
         get availability slash command
         :param interaction: interaction
-        :param user_str: users to get availabilities from
-        :param week_num: specified week num
+        :param users: List of users or user IDs, if no user is found then it will display everyone
+        :param week_num: Week number (offset from the first week of the current year)
+        :param show_overlap_numbers: Show the number of overlaps if multiple users are displayed
         :return: None
         """
         today_date = datetime.today()
 
         if week_num < 0:
             week_num = int(today_date.strftime("%U"))
-        await display_availabilities(self.bot, interaction, user_str, week_num, today_date.year)
+        await display_availabilities(self.bot, interaction, users, week_num, today_date.year, show_overlap_numbers)
 
     @app_commands.command(name="edit-availability", description="Edit your availabilities")
     async def edit_availability(self, interaction: discord.Interaction):
@@ -359,7 +360,7 @@ async def edit_availabilities(interaction: discord.Interaction, amount: int, off
     except Exception as ex:
         print(ex)
 
-async def display_availabilities(bot, interaction: discord.Interaction, user_str: str, week_num, year_num):
+async def display_availabilities(bot, interaction: discord.Interaction, user_str: str, week_num, year_num, show_numbers = True):
     """
     Display the availability for the specified week
     :param bot: Bot
@@ -451,7 +452,7 @@ async def display_availabilities(bot, interaction: discord.Interaction, user_str
 
 
 
-        await create_image(bot, filtered_availabilities_list, week_dates)
+        await create_image(bot, filtered_availabilities_list, week_dates, show_numbers)
         with open('generated_images/schedule.png', 'rb') as f:
             await interaction.response.send_message(f"Availabilities:", file=discord.File(f))
     except Exception as ex:
