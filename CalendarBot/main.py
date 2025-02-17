@@ -8,17 +8,18 @@ from discord import app_commands
 load_dotenv()
 
 class Client(commands.Bot):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     async def on_ready(self):
         print(f'Logged in as {self.user}')
 
         # sync slash commands
         try:
-            guildID = discord.Object(id=1340369941001539636)
-            synced_commands = await bot.tree.sync()
+            synced_commands = await self.tree.sync()
             print(f"Synced {len(synced_commands)} commands")
         except Exception as e:
             print(f"Failed to sync commands: {e}")
-
 
 TOKEN = os.getenv("BOT_TOKEN")
 intents = discord.Intents.all()

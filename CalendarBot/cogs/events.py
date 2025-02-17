@@ -5,7 +5,7 @@ import asyncio
 
 import sqlite3
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 database = sqlite3.connect("database.db")
 cursor = database.cursor()
@@ -35,9 +35,44 @@ class Events(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+
     @commands.Cog.listener()
     async def on_ready(self):
         print("Bot is online!")
+        self.bot.loop.create_task(self.hourly_task())
+
+    async def send_reminders(self):
+        current_datetime = datetime.now()
+        print(current_datetime)
+        twenty_four_hours_later = current_datetime + timedelta(hours=24)
+        margin = timedelta(minutes=5)
+
+        query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Confirmed'"
+        cursor.execute(query, (twenty_four_hours_later - margin, twenty_four_hours_later + margin))
+        result = cursor.fetchall()
+        if result:
+            for event in result:
+                # Get the default channel (the first text channel in the guild)
+                guild = self.bot.get_guild(1340369941001539636)  # Replace with your guild ID
+                if guild:
+                    # Find the first text channel in the guild (or modify if needed)
+                    default_channel = guild.text_channels[0]  # This gets the first text channel
+                    if default_channel:
+                        await default_channel.send(f"Hey @everyone! The event, **{event[3]}**, will occur in 24 hours!")
+                        print(f"Reminder for {event[3]} sent.")
+                    else:
+                        print("Default channel not found.")
+                else:
+                    print("Guild not found.")
+
+    async def hourly_task(self):
+        await self.bot.wait_until_ready()
+        while not self.bot.is_closed():
+            # Check if an event is 24 hours away so we can call a reminder
+            await self.send_reminders()
+            print("Sent reminders.")
+            # Wait for an hour (3600 seconds) before running again
+            await asyncio.sleep(10)
 
     @app_commands.command(name="create-event", description="Creates an event")
     async def createevent(self, interaction: discord.Interaction):
@@ -366,5 +401,4 @@ class EditEventModal(discord.ui.Modal, title="Edit Event"):
             await interaction.response.send_message(f"Event `{self.event_id}` updated successfully!")
         except Exception as e:
             await interaction.response.send_message(f"Error updating event: {str(e)}", ephemeral=True)
-
 
