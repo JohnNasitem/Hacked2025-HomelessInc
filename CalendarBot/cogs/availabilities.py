@@ -23,7 +23,6 @@ database.execute("""CREATE TABLE IF NOT EXISTS availability(
                  RECURRING TEXT
                  )""")
 
-
 col_header_font = ImageFont.truetype("arial.ttf", 45)
 row_header_font = ImageFont.truetype("arial.ttf", 30)
 days_of_week = [ "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
@@ -39,7 +38,6 @@ def discordTime(date_time, format=None):
         return f"<t:{int(datetime.timestamp(date_time))}:t>"
     if format == "D":
         return f"<t:{int(datetime.timestamp(date_time))}:D>"
-
 
 class CreateAvailabilityModal(discord.ui.Modal, title="Create Availability"):
     def __init__(self):
@@ -162,7 +160,6 @@ class EditAvailabilityModal(discord.ui.Modal, title="Edit Availability"):
                 ephemeral=True)
             return None
 
-
 class Day:
     """
     Holds an availability slot on the selected day for a specific user
@@ -172,7 +169,6 @@ class Day:
         self.date = date
         self.start_time = start_time
         self.end_time = end_time
-
 
 class Availability(commands.Cog):
     def __init__(self, bot):
