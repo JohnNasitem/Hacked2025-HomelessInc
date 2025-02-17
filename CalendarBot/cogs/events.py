@@ -20,7 +20,8 @@ database.execute("""CREATE TABLE IF NOT EXISTS event(
                  Description TEXT,
                  StartTime DATETIME,
                  EndTime DATETIME,
-                 Status TEXT
+                 Status TEXT,
+                 ChannelID INTEGER
                  )""")
 database.execute("""CREATE TABLE IF NOT EXISTS rsvp(
                  EventID INTEGER,
@@ -39,14 +40,14 @@ class Events(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print("Bot is online!")
-        self.bot.loop.create_task(self.hourly_task())
+        self.bot.loop.create_task(self.event_hourly_task())
 
-    async def send_reminders(self):
+    async def send_early_reminder(self):
         current_datetime = datetime.now()
-        print(current_datetime)
         twenty_four_hours_later = current_datetime + timedelta(hours=24)
         margin = timedelta(minutes=5)
 
+        # find events to that start in about 24 hours that are confirmed to happen
         query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Confirmed'"
         cursor.execute(query, (twenty_four_hours_later - margin, twenty_four_hours_later + margin))
         result = cursor.fetchall()
@@ -55,22 +56,76 @@ class Events(commands.Cog):
                 # Get the default channel (the first text channel in the guild)
                 guild = self.bot.get_guild(1340369941001539636)  # Replace with your guild ID
                 if guild:
-                    # Find the first text channel in the guild (or modify if needed)
-                    default_channel = guild.text_channels[0]  # This gets the first text channel
-                    if default_channel:
-                        await default_channel.send(f"Hey @everyone! The event, **{event[3]}**, will occur in 24 hours!")
+                    channel_id = event[8]
+                    # find the channel where the user originally created the event
+                    channel = guild.get_channel(channel_id)
+                    if channel:
+                        await channel.send(f"Hey @everyone! The event, **{event[3]}**, will occur in 24 hours!")
                         print(f"Reminder for {event[3]} sent.")
                     else:
-                        print("Default channel not found.")
+                        print("Channel not found.")
                 else:
                     print("Guild not found.")
 
-    async def hourly_task(self):
+    # send reminder when event is starting
+    async def send_starting_reminder(self):
+        current_datetime = datetime.now()
+        margin = timedelta(minutes=5)
+
+        # find events to that start in about 24 hours that are confirmed to happen
+        query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Confirmed'"
+        cursor.execute(query, (current_datetime - margin, current_datetime + margin))
+        result = cursor.fetchall()
+        if result:
+            for event in result:
+                # Get the default channel (the first text channel in the guild)
+                guild = self.bot.get_guild(1340369941001539636)  # Replace with your guild ID
+                if guild:
+                    channel_id = event[8]
+                    # find the channel where the user originally created the event
+                    channel = guild.get_channel(channel_id)
+                    if channel:
+                        await channel.send(f"Hey @everyone! The event, **{event[3]}**, is occurring!")
+                        print(f"Reminder for {event[3]} sent.")
+                    else:
+                        print("Channel not found.")
+                else:
+                    print("Guild not found.")
+
+    # remind creator of event 48 hours before event that their event will be starting
+    async def remind_creator(self):
+        current_datetime = datetime.now()
+        forty_eight_hours_later = current_datetime + timedelta(hours=48)
+        margin = timedelta(minutes=5)
+
+        query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Pending'"
+        cursor.execute(query, (forty_eight_hours_later - margin, forty_eight_hours_later + margin))
+        result = cursor.fetchall()
+        print(result)
+        if result:
+            for event in result:
+                # Get the default channel (the first text channel in the guild)
+                guild = self.bot.get_guild(1340369941001539636)  # Replace with your guild ID
+                if guild:
+                    user_id = event[1]
+                    user = self.bot.get_user(user_id)
+                    if user:
+                        await user.send(f"Hey {user.mention}! The event, **{event[3]}** in **{guild.name}** has not been confirmed yet. Please confirm it (via `/edit-event`) so that server members can be notified 24 hours before!")
+                        print(f"Reminder for {event[3]} sent.")
+                    else:
+                        print("User not found.")
+                else:
+                    print("Guild not found.")
+
+    async def event_hourly_task(self):
         await self.bot.wait_until_ready()
         while not self.bot.is_closed():
             # Check if an event is 24 hours away so we can call a reminder
-            await self.send_reminders()
+            await self.send_early_reminder()
+            await self.send_starting_reminder()
+            await self.remind_creator()
             print("Sent reminders.")
+
             # Wait for an hour (3600 seconds) before running again
             await asyncio.sleep(10)
 
@@ -79,8 +134,9 @@ class Events(commands.Cog):
         event_id = int(time.time() * 1000)
         creator_id = interaction.user.id
         creator = interaction.user.name
+        channel_id = interaction.channel.id
 
-        await interaction.response.send_modal(CreateEventModal(event_id, creator_id, creator))
+        await interaction.response.send_modal(CreateEventModal(event_id, creator_id, creator, channel_id))
 
     @app_commands.command(name="view-events", description="Displays all events created")
     async def viewevents(self, interaction: discord.Interaction):  # TODO: can add pagination
@@ -265,12 +321,14 @@ def fetch_rsvp_response(event_id, response):
 
 # modal to create event
 class CreateEventModal(discord.ui.Modal, title="Create Event"):
-    def __init__(self, event_id: int, creator_id: int, creator: str):
+    def __init__(self, event_id: int, creator_id: int, creator: str, channel_id: int):
         super().__init__()
         self.event_id = event_id
         self.creator_id = creator_id
         self.creator = creator
         self.status = "Not set"
+        self.channel_id = channel_id
+
 
         self.name = discord.ui.TextInput(label="Event Name", style=discord.TextStyle.short, required=True)
         self.description = discord.ui.TextInput(label="Event Description", style=discord.TextStyle.paragraph,
@@ -315,8 +373,8 @@ class CreateEventModal(discord.ui.Modal, title="Create Event"):
             return
 
         try:
-            query = "INSERT INTO event VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-            cursor.execute(query, (self.event_id, self.creator_id, self.creator, self.name.value, self.description.value, self.start_time.value, self.end_time.value, self.status))
+            query = "INSERT INTO event VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            cursor.execute(query, (self.event_id, self.creator_id, self.creator, self.name.value, self.description.value, self.start_time.value, self.end_time.value, self.status, self.channel_id))
             database.commit()
             await interaction.response.send_message(f"Event `{self.event_id}` created successfully!")
         except Exception as e:
