@@ -188,7 +188,8 @@ class Availability(commands.Cog):
                 for result in get_all_availabilities():
                     week_test.append(Availability.convert_row_to_day(result))
 
-            await create_image(self.bot, week_data)
+            today_date = datetime.today()
+            await create_image(self.bot, week_test, int(today_date.strftime("%U")), today_date.year)
             with open('generated_images/schedule.png', 'rb') as f:
                 await interaction.response.send_message(f"Availabilities>", file=discord.File(f))
         except Exception as ex:
