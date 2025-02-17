@@ -25,6 +25,7 @@ class Ping(commands.Cog):
             await ctx.send(f"Synced {len(synced_commands)} commands")
             print(f"Synced {len(synced_commands)} commands")
         except Exception as e:
+            await ctx.send(f"Failed to sync commands: {e}")
             print(f"Failed to sync commands: {e}")
 
 async def setup(bot):
