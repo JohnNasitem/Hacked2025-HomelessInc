@@ -15,11 +15,12 @@ class Client(commands.Bot):
         print(f'Logged in as {self.user}')
 
         # sync slash commands
-        try:
-            synced_commands = await self.tree.sync()
-            print(f"Synced {len(synced_commands)} commands")
-        except Exception as e:
-            print(f"Failed to sync commands: {e}")
+        # apparently the bot gets rate limited if syncing is in on_ready so manually run !sync
+        # try:
+        #     synced_commands = await self.tree.sync()
+        #     print(f"Synced {len(synced_commands)} commands")
+        # except Exception as e:
+        #     print(f"Failed to sync commands: {e}")
 
 TOKEN = os.getenv("BOT_TOKEN")
 intents = discord.Intents.all()
