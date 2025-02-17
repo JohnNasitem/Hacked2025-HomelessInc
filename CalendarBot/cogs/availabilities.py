@@ -697,7 +697,7 @@ def db_delete_availability(row):
         cursor.execute(query, row)
         database.commit()
     except Exception as ex:
-        print(f"Problem with updating database\n{ex}")
+        print(f"Problem with deleting entry\n{ex}")
 
 def db_clean_up_old():
     """
@@ -710,7 +710,7 @@ def db_clean_up_old():
     for result in all_availabilities:
         user_id, date, start_time, end_time, recurring = result  # unpack the tuple
         if date < datetime.today().strftime("%Y-%m-%d") and recurring == "false":
-            availabilities_to_remove = result
+            availabilities_to_remove.append(result)
 
     for result_to_remove in availabilities_to_remove:
-        db_delete_availability(db_delete_availability)
+        db_delete_availability(result_to_remove)
