@@ -28,6 +28,12 @@ row_header_font = ImageFont.truetype("arial.ttf", 30)
 days_of_week = [ "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 time_regex_string = r"(\d\d?):(\d\d) (am|pm)"
 
+def discordTime(date_time):
+    """
+    Convert date_time to a discord timestamp
+    """
+    return f"<t:{int(datetime.timestamp(date_time))}>" 
+
 
 class Day:
     """
@@ -39,6 +45,7 @@ class Day:
         self.start_time = start_time
         self.end_time = end_time
 
+
 class Availability(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -47,33 +54,32 @@ class Availability(commands.Cog):
     async def on_ready(self):
         print("Availability is ready!")
 
-    @staticmethod
-    def _correctDateTimeFormat(date, time):
-        """
-        Check if date and time is in the following formats respectivel:
-        YYYY-MM-DD 
-        HH:MM
+    # depracated function do not use
+    # @staticmethod
+    # def _verifyFormat(date, time):
+    #     """
+    #     Check if date and time is in the following formats respectivel:
+    #     YYYY-MM-DD 
+    #     HH:MM
 
-        Returns:
-            True if both are in the correct format
-            False otherwise
-        """
-        date_format = "%Y-%m-%d" 
-        time_format = "%I:%M %p"
-        try:
-            datetime.strptime(date, date_format)
-            datetime.strptime(time, time_format)
-            return True
-        except ValueError:
-            return False
-        
-    @staticmethod
-    def _convertToUnix(date, time):
-        """
-        Convert date and time to a Unix timestamp
-        """
-        date_time = datetime.strptime(f"{date} {time}", "%Y-%m-%d %I:%M %p")
-        return int(datetime.timestamp(date_time))
+    #     Returns:
+    #         True if both are in the correct format
+    #         False otherwise
+    #     """
+    #     try:
+    #         datetime.strptime(f"{date} {time}", "%Y-%m-%d %I:%M %p")
+    #         return True
+    #     except ValueError:
+    #         return False
+    
+    # depracated function do not use
+    # @staticmethod
+    # def _convertToUnix(date, time):
+    #     """
+    #     Convert date and time to a Unix timestamp
+    #     """
+    #     date_time = datetime.strptime(f"{date} {time}", "%Y-%m-%d %I:%M %p")
+    #     return int(datetime.timestamp(date_time))
 
     @staticmethod
     def convert_row_to_day(row):
@@ -82,7 +88,10 @@ class Availability(commands.Cog):
         return Day(result_user_id, dt_date.strftime('%Y-%m-%d'), start_time, end_time)
 
     @app_commands.command(name="set-availability", description="Set your availability for a specific time period")
-    @app_commands.describe(repeating="Choose how often this availability repeats")
+    @app_commands.describe(day="Choose the day you are available (YYYY-MM-DD)",
+                           start_time="Choose the time you are available to start (HH:MM AM/PM)",
+                           end_time="Choose the time you are available to end (HH:MM AM/PM)",
+                           repeating="Choose how often this availability repeats (Default: no repeat)",)
     @app_commands.choices(repeating=[
         discord.app_commands.Choice(name="Does not repeat", value="false"),
         discord.app_commands.Choice(name="Daily", value="daily"),
@@ -90,7 +99,7 @@ class Availability(commands.Cog):
         discord.app_commands.Choice(name="Monthly", value="monthly"),
         discord.app_commands.Choice(name="Yearly", value="yearly")
     ])
-    async def set_availability(self, interaction: discord.Interaction, day: str, start_time: str, end_time: str, repeating: str):
+    async def set_availability(self, interaction: discord.Interaction, start_time: str, end_time: str, day: str=None, repeating: str = "false"):
         """
         Set the availability for a specific time period
 
@@ -101,20 +110,25 @@ class Availability(commands.Cog):
         shouts out to chris for getting slash commands to work
         """
         try:
-            if not self._correctDateTimeFormat(day, start_time) or not self._correctDateTimeFormat(day, end_time):  # verify if start and end correctly formatted
-                raise Exception("Invalid date_time format.")
+            if day is None:
+                day = datetime.today().strftime("%Y-%m-%d") 
+            # create datetime objects for start and end to simplify
+            start_date = datetime.strptime(f"{day} {start_time}", "%Y-%m-%d %I:%M %p")
+            end_date = datetime.strptime(f"{day} {end_time}", "%Y-%m-%d %I:%M %p")
 
-            if self._convertToUnix(day, start_time) > self._convertToUnix(day, end_time):
-                await interaction.response.send_message("Start time cannot be after end time!")
-                return
+            if start_date.timestamp() > end_date.timestamp():  # Check if start time is before end time
+                raise Exception("Start time cannot be after end time.")
             
-            await interaction.response.send_message(f"Set availability for <@{interaction.user.id}> from <t:{self._convertToUnix(day, start_time)}> to <t:{self._convertToUnix(day, end_time)}> repeating: {repeating}")
+            await interaction.response.send_message(f"Set availability for {interaction.user.mention} from {discordTime(start_date)} to {discordTime(end_date)} repeating: {repeating}")
 
             db_add_availability(interaction.user.id, day, start_time, end_time, repeating)
         
+        except ValueError:
+            await interaction.response.send_message("Improperly formatted date or time. Please provide the times in the following format: YYYY-MM-DD HH:MM AM/PM")
         except Exception as exception:
             await interaction.response.send_message(f"{exception} Please provide the times in the following format: YYYY-MM-DD HH:MM AM/PM")
             return None
+
 
     @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
     async def get_availability(self, interaction: discord.Interaction, user_str: str = "", week_num: int = -1):
@@ -138,18 +152,27 @@ class Availability(commands.Cog):
         :param interaction: interaction
         :return: None
         """
-        avail_string = ""
-        for index,result in enumerate(db_get_availability(interaction.user.id)):
-            result_user_id, availability_date, start_time, end_time, recurring = result
-            avail_string += f'**{index + 1}**: <t:{Availability._convertToUnix(availability_date, start_time)}> - <t:{Availability._convertToUnix(availability_date, end_time)}>'
 
-        edit_availability_embed = discord.Embed(
-            title = "Your Availabilities",
-            description = avail_string,
-            color=interaction.user.color
+        edit_embed = discord.Embed(
+            title = "Edit Availabilities",
+            description = "Please select an availability to edit",
+            color = interaction.user.colour
         )
 
-        await interaction.response.send_message(embed=edit_availability_embed)
+        for index,result in enumerate(db_get_availability(interaction.user.id)):
+            user_id, date, start_time, end_time, recurring = result  # unpack the tuple
+
+            # create datetime objects for start and end to simplify
+            start = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %I:%M %p")
+            end = datetime.strptime(f"{date} {end_time}", "%Y-%m-%d %I:%M %p")
+
+            edit_embed.add_field(
+                name = f"{index + 1} <t:{int(start.timestamp())}:D>",
+                value = f"<t:{int(start.timestamp())}:t> to <t:{int(end.timestamp())}:t>",    
+                inline=False
+            )
+
+        await interaction.response.send_message(embed=edit_embed)
 
 async def setup(bot):
     await bot.add_cog(Availability(bot))
