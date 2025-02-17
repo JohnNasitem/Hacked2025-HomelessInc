@@ -22,7 +22,7 @@ class Ping(commands.Cog):
         """
         try:
             synced_commands = await ctx.bot.tree.sync(guild=ctx.guild)
-            await ctx.sendd(f"Synced {len(synced_commands)} commands")
+            await ctx.send(f"Synced {len(synced_commands)} commands")
             print(f"Synced {len(synced_commands)} commands")
         except Exception as e:
             print(f"Failed to sync commands: {e}")
