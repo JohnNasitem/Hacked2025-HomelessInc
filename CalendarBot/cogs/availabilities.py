@@ -38,52 +38,6 @@ class Day:
         self.start_time = start_time
         self.end_time = end_time
 
-#harded coded text values
-week = [
-    # ID 1 (Person 1)
-    Day(357657793215332357, "2025-02-16", "8:00 am", "12:00 pm"),
-    Day(357657793215332357, "2025-02-17", "1:00 pm", "4:00 pm"),
-    Day(357657793215332357, "2025-02-18", "9:00 am", "12:00 pm"),
-    Day(357657793215332357, "2025-02-19", "7:30 am", "11:30 am"),
-    Day(357657793215332357, "2025-02-20", "10:00 am", "2:00 pm"),
-    Day(357657793215332357, "2025-02-21", "8:30 am", "12:30 pm"),
-    Day(357657793215332357, "2025-02-22", "9:00 am", "11:30 am"),
-    Day(357657793215332357, "2025-02-23", "10:00 am", "12:30 pm"),
-
-    # ID 2 (Person 2)
-    Day(799817805099827200, "2025-02-16", "7:00 am", "11:00 am"),
-    Day(799817805099827200, "2025-02-17", "12:00 pm", "4:00 pm"),
-    Day(799817805099827200, "2025-02-18", "8:00 am", "12:00 pm"),
-    Day(799817805099827200, "2025-02-19", "6:30 am", "10:30 am"),
-    Day(799817805099827200, "2025-02-20", "9:00 am", "1:00 pm"),
-    Day(799817805099827200, "2025-02-21", "8:00 am", "12:00 pm"),
-    Day(799817805099827200, "2025-02-22", "7:30 am", "11:30 am"),
-    Day(799817805099827200, "2025-02-23", "9:00 am", "12:00 pm"),
-
-    # ID 3 (Person 3)
-    Day(183651970526085120, "2025-02-16", "8:00 am", "12:00 pm"),
-    Day(183651970526085120, "2025-02-17", "9:00 am", "1:00 pm"),
-    Day(183651970526085120, "2025-02-18", "2:00 pm", "5:00 pm"),
-    Day(183651970526085120, "2025-02-19", "10:00 am", "1:00 pm"),
-    Day(183651970526085120, "2025-02-20", "2:30 pm", "5:30 pm"),
-    Day(183651970526085120, "2025-02-21", "12:00 pm", "4:00 pm"),
-
-    # ID 4 (Person 4)
-    Day(401501356327698434, "2025-02-16", "10:00 am", "1:00 pm"),
-    Day(401501356327698434, "2025-02-17", "11:00 am", "2:00 pm"),
-    Day(401501356327698434, "2025-02-18", "9:30 am", "12:30 pm"),
-    Day(401501356327698434, "2025-02-19", "3:00 pm", "6:00 pm"),
-    Day(401501356327698434, "2025-02-20", "10:00 am", "12:30 pm"),
-
-    # ID 5 (Person 5)
-    Day(381874990783528960, "2025-02-16", "9:00 am", "1:00 pm"),
-    Day(381874990783528960, "2025-02-17", "2:00 pm", "5:00 pm"),
-    Day(381874990783528960, "2025-02-18", "8:00 am", "12:00 pm"),
-    Day(381874990783528960, "2025-02-19", "11:30 am", "2:30 pm"),
-    Day(381874990783528960, "2025-02-20", "1:00 pm", "4:00 pm"),
-    Day(381874990783528960, "2025-02-21", "8:00 am", "11:00 am"),
-]
-
 class Availability(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -135,7 +89,7 @@ class Availability(commands.Cog):
         discord.app_commands.Choice(name="Monthly", value="monthly"),
         discord.app_commands.Choice(name="Yearly", value="yearly")
     ])
-    async def setAvailability(self, interaction: discord.Interaction, day: str, start_time: str, end_time: str, repeating: str):
+    async def set_availability(self, interaction: discord.Interaction, day: str, start_time: str, end_time: str, repeating: str):
         """
         Set the availability for a specific time period
 
@@ -159,22 +113,16 @@ class Availability(commands.Cog):
 
 
     @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
-    async def getAvailability(self, interaction: discord.Interaction, user_str: str = "", week_num: int = -1):
+    async def get_availability(self, interaction: discord.Interaction, user_str: str = "", week_num: int = -1):
         today_date = datetime.today()
 
         if week_num < 0:
             week_num = int(today_date.strftime("%U"))
         await display_availabilities(self.bot, interaction, user_str, week_num, today_date.year)
-        
-    @commands.command()
-    async def image(self, ctx):
-        try:
-            date_obj = datetime.today()
-            await create_image(self.bot, week, int(date_obj.strftime("%U")), date_obj.year)
-            with open('generated_images/schedule.png', 'rb') as f:
-                await ctx.send("Here is your image!", file=discord.File(f))
-        except Exception as e:
-            await ctx.send(f"Couldn't Generate Image\n{e}")
+
+    @app_commands.command(name="edit-availability", description="Edit your availabilities")
+    async def edit_availability(self, interaction: discord.Interaction):
+        print("not implemented")
 
 async def setup(bot):
     await bot.add_cog(Availability(bot))
