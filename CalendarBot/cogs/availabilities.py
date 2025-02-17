@@ -159,9 +159,12 @@ class Availability(commands.Cog):
 
 
     @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
-    async def getAvailability(self, interaction: discord.Interaction, user_str: str = ""):
+    async def getAvailability(self, interaction: discord.Interaction, user_str: str = "", week_num: int = -1):
         today_date = datetime.today()
-        await display_availabilties(self.bot, interaction, user_str, int(today_date.strftime("%U")), today_date.year)
+
+        if week_num < 0:
+            week_num = int(today_date.strftime("%U"))
+        await display_availabilities(self.bot, interaction, user_str, week_num, today_date.year)
         
     @commands.command()
     async def image(self, ctx):
@@ -230,7 +233,7 @@ async def display_availabilities(bot, interaction: discord.Interaction, user_str
             if week_dates[0].strftime('%Y-%m-%d') <= availability.date <= week_dates[6].strftime('%Y-%m-%d'):
                 filtered_availabilities_list.append(availability)
 
-        await create_image(self.bot, filtered_availabilities_list, week_dates)
+        await create_image(bot, filtered_availabilities_list, week_dates)
         with open('generated_images/schedule.png', 'rb') as f:
             await interaction.response.send_message(f"Availabilities>", file=discord.File(f))
     except Exception as ex:
