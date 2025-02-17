@@ -30,57 +30,13 @@ class Events(commands.Cog):
     async def on_ready(self):
         print("Bot is online!")
 
-
-
     @app_commands.command(name="create-event", description="Creates an event")
-    async def createevent(self, interaction: discord.Interaction, name: str, description: str, start_time: str, end_time: str):
+    async def createevent(self, interaction: discord.Interaction):
+        event_id = int(time.time() * 1000)
         creator_id = interaction.user.id
         creator = interaction.user.name
-        event_id = int(time.time() * 1000)
 
-        datetime_format = "%Y-%m-%d %H:%M"  # no seconds
-        try:
-            # check start_time and end_time are in correct date_time format
-            start_time = datetime.strptime(start_time, datetime_format)
-            end_time = datetime.strptime(end_time, datetime_format)
-            if start_time > end_time:
-                await interaction.response.send_message("Start time must be before end time!")
-                return
-            elif start_time == end_time:
-                await interaction.response.send_message("Start time and end time cannot be the same!")
-                return
-        except ValueError:
-            await interaction.response.send_message(
-                f"Incorrect datetime format, should be {datetime_format}, like 2025-02-14 15:30, or incorrect datetime values inputted")
-            return
-
-        # set status based on current datetime compared to event datetimes
-        status_options = ["Pending", "Ongoing", "Cancelled"]
-        current_datetime = datetime.now()
-        if current_datetime < start_time:
-            status = status_options[0]
-        elif current_datetime < end_time:
-            status = status_options[1]
-        else:
-            await interaction.response.send_message("Invalid event time! Cannot create event in the past.")
-            return
-
-        # insert values into query
-        try:
-            query = "INSERT INTO event VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-            cursor.execute(query, (event_id, creator_id, creator, name, description, start_time, end_time, status))
-            database.commit()
-
-            # confirmation message
-            await interaction.response.send_message(
-                f"Event has been saved! Event ID: {event_id} <@{creator_id}> has created event **{name}** ({status}) starting from **{start_time} to {end_time}**.")
-        except Exception as e:
-            await interaction.response.send_message(f"Database error: {str(e)}")
-
-            # for debugging purposes
-        # await interaction.response.send_message(
-            # f"Message saved! We have stored: {event_id}, {creator_id}, {creator}, {name}, {description}, {start_time}, {end_time}, {status}")
-
+        await interaction.response.send_modal(CreateEventModal(event_id, creator_id, creator))
 
     @app_commands.command(name="view-events", description="Displays all events created")
     async def viewevents(self, interaction: discord.Interaction):  # TODO: can add pagination
@@ -111,7 +67,7 @@ class Events(commands.Cog):
     # first takes in the event id and checks if it exists
     # checks current user is creator of that event
     # then provides options to change
-    @app_commands.command(name="edit-events", description="Edits an event")
+    @app_commands.command(name="edit-event", description="Edits an event")
     async def editevent(self, interaction: discord.Interaction, event_id: int):
         result = check_valid_event(event_id)
         if result is None:  # nothing fetched from database
@@ -122,10 +78,8 @@ class Events(commands.Cog):
             await interaction.response.send_message("You are not the creator of this event. Cannot edit event.")
             return
 
-        # await interaction.response.send_message({result})
-        print("before")
         await interaction.response.send_modal(EditEventModal(event_id))
-        print("yay")
+
     # @commands.command() # test command for followup messages
     # async def followup(self, ctx):
     #     await ctx.send("plz say something")
@@ -136,33 +90,21 @@ class Events(commands.Cog):
 
 
     # cancelevent command cancels an event; needs event id and requires the user who created the event
-    @commands.command()
-    async def cancelevent(self, ctx, *, message: str):
-        await ctx.send(f"Message received: {message}. In cancelevent command") # testing
-
-        # update events appropriately
-        delete_past_events()
-        change_to_ongoing()
-
-        try:
-            event_id = int(message.strip()) # convert string input into int
-        except ValueError:
-            await ctx.send("Invalid event ID! Please provide a valid numeric ID.")
-            return
-
+    @app_commands.command(name="delete-event", description="Deletes an event")
+    async def deleteevent(self, interaction: discord.Interaction, event_id: int):
         # fetch the event from the database, if possible
         result = check_valid_event(event_id)
         if result is None: # nothing fetched from database
-            await ctx.send("No such event exists!")
+            await interaction.response.send_message("No such event exists or invalid event id provided!")
             return
 
         # check if current user is the user that created the event
-        if result[1] != ctx.message.author.id:
-            await ctx.send("You are not the creator of this event. Cannot cancel event.")
+        if result[1] != interaction.user.id:
+            await interaction.response.send_message("You are not the creator of this event. Cannot delete event.")
             return
 
-        cancel_event(event_id)
-        await ctx.send(f"Event {result[3]} has been cancelled.") # result[3] is event name
+        delete_event(event_id)
+        await interaction.response.send_message(f"Event **{result[3]}** has been **deleted**.") # result[3] is event name
 
 
 async def setup(bot):
@@ -210,23 +152,70 @@ def cancel_event(event_id):
     cursor.execute(query, ("Cancelled", event_id))
     database.commit()
 
+# modal to create event
+class CreateEventModal(discord.ui.Modal, title="Create Event"):
+    def __init__(self, event_id: int, creator_id: int, creator: str):
+        super().__init__()
+        self.event_id = event_id
+        self.creator_id = creator_id
+        self.creator = creator
+        self.status = "Not set"
+
+        self.name = discord.ui.TextInput(label="Event Name", style=discord.TextStyle.short, required=True)
+        self.description = discord.ui.TextInput(label="Event Description", style=discord.TextStyle.paragraph,
+                                                required=False)
+        self.start_time = discord.ui.TextInput(label="Start Time (YYYY-MM-DD HH:MM)", style=discord.TextStyle.short,
+                                               required=True)
+        self.end_time = discord.ui.TextInput(label="End Time (YYYY-MM-DD HH:MM)", style=discord.TextStyle.short,
+                                             required=True)
+
+        # Add components to the modal
+        self.add_item(self.name)
+        self.add_item(self.description)
+        self.add_item(self.start_time)
+        self.add_item(self.end_time)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        # check if datetime was inserted properly
+        datetime_format = "%Y-%m-%d %H:%M"  # no seconds
+        try:
+            # check start_time and end_time are in correct date_time format
+            start_time = datetime.strptime(self.start_time.value, datetime_format)
+            end_time = datetime.strptime(self.end_time.value, datetime_format)
+            if start_time > end_time:
+                await interaction.response.send_message("Start time must be before end time!")
+                return
+            elif start_time == end_time:
+                await interaction.response.send_message("Start time and end time cannot be the same!")
+                return
+        except ValueError:
+            await interaction.response.send_message(
+                f"Incorrect datetime format, should be {datetime_format}, like 2025-02-14 15:30, or incorrect datetime values inputted")
+            return
+
+        status_options = ["Pending", "Ongoing"]
+        current_datetime = datetime.now()
+        if current_datetime < start_time:
+            self.status = status_options[0]
+        elif current_datetime < end_time:
+            self.status = status_options[1]
+        else:
+            await interaction.response.send_message("Invalid event time! Cannot create event in the past.")
+            return
+
+        try:
+            query = "INSERT INTO event VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            cursor.execute(query, (self.event_id, self.creator_id, self.creator, self.name.value, self.description.value, self.start_time.value, self.end_time.value, self.status))
+            database.commit()
+            await interaction.response.send_message(f"Event `{self.event_id}` created successfully!")
+        except Exception as e:
+            await interaction.response.send_message(f"Error updating event: {str(e)}", ephemeral=True)
+
+# modal to edit event
 class EditEventModal(discord.ui.Modal, title="Edit Event"):
     def __init__(self, event_id: int):
         super().__init__()
         self.event_id = event_id
-
-        # name = discord.ui.TextInput(label="Event Name", style=discord.TextStyle.short)
-        # description = discord.ui.TextInput(label="Event Description", style=discord.TextStyle.paragraph)
-        # start_time = discord.ui.TextInput(label="Start Time", style=discord.TextStyle.short)
-        # end_time = discord.ui.TextInput(label="End Time", style=discord.TextStyle.short)
-        # status = discord.ui.Select(
-        #     placeholder="Select event status",
-        #     options=[
-        #         discord.SelectOption(label="Pending", value="Pending"),
-        #         discord.SelectOption(label="Confirmed", value="Confirmed"),
-        #         discord.SelectOption(label="Cancelled", value="Cancelled"),
-        #     ],
-        # )
 
         self.name = discord.ui.TextInput(label="Event Name", style=discord.TextStyle.short, required=True)
         self.description = discord.ui.TextInput(label="Event Description", style=discord.TextStyle.paragraph,
@@ -238,7 +227,6 @@ class EditEventModal(discord.ui.Modal, title="Edit Event"):
         self.status = discord.ui.TextInput(label="Status (Pending, Confirmed, Cancelled)",
                                            style=discord.TextStyle.short, required=True)
 
-
         # Add components to the modal
         self.add_item(self.name)
         self.add_item(self.description)
@@ -246,28 +234,43 @@ class EditEventModal(discord.ui.Modal, title="Edit Event"):
         self.add_item(self.end_time)
         self.add_item(self.status)
 
-
     async def on_submit(self, interaction: discord.Interaction):
-        status = self.status.value.strip().lower()  # Get the status value and make it lowercase
+        # check if datetime was inserted properly
+        datetime_format = "%Y-%m-%d %H:%M"  # no seconds
+        try:
+            # check start_time and end_time are in correct date_time format
+            start_time = datetime.strptime(self.start_time.value, datetime_format)
+            end_time = datetime.strptime(self.end_time.value, datetime_format)
+            if start_time > end_time:
+                await interaction.response.send_message("Start time must be before end time!")
+                return
+            elif start_time == end_time:
+                await interaction.response.send_message("Start time and end time cannot be the same!")
+                return
+        except ValueError:
+            await interaction.response.send_message(
+                f"Incorrect datetime format, should be {datetime_format}, like 2025-02-14 15:30, or incorrect datetime values inputted")
+            return
 
+        # check if status was entered properly
+        status = self.status.value.strip().lower()  # Get the status value and make it lowercase
         if status == "cancelled":
-            status = "Cancelled"
+            self.status = "Cancelled"
         elif status == "confirmed":
-            status = "Confirmed"
+            self.status = "Confirmed"
         elif status == "pending":
-            status = "Pending"
+            self.status = "Pending"
         else:
             await interaction.response.send_message(
-                f"Invalid status. Please enter one of the following: Pending, Confirmed, Cancelled"
-            )
+                f"Invalid status. Please enter one of the following: Pending, Confirmed, Cancelled")
             return
 
         try:
             query = "UPDATE event SET Name = ?, Description = ?, StartTime = ?, EndTime = ?, Status = ? WHERE ID = ?"
-            cursor.execute(query, (self.name.value, self.description.value, self.start_time.value, self.end_time.value, self.status.value, self.event_id))
+            cursor.execute(query, (self.name.value, self.description.value, self.start_time.value, self.end_time.value, self.status, self.event_id))
             database.commit()
             await interaction.response.send_message(f"Event `{self.event_id}` updated successfully!")
         except Exception as e:
-            await interaction.response.send_message(f"❌ Error updating event: {str(e)}", ephemeral=True)
+            await interaction.response.send_message(f"Error updating event: {str(e)}", ephemeral=True)
 
 
