@@ -8,3 +8,4 @@ CalenderBot/.env
 /CalendarBot/cogs/__pycache__
 CalendarBot/.env
 CalendarBot/database.db
+/CalendarBot/__pycache__
