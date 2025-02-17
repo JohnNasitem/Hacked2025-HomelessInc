@@ -8,7 +8,6 @@ from helper import discord_time
 
 database = sqlite3.connect("database.db", 10)
 
-# TODO: add try catch to all user commands
 # TODO: Tighten the margins for reminders and make hourly task run every 30 mins instead
 # TODO: use regex instead of "%Y-%m-%d %I:%M %p", to allow users to flexible time inputs like 3am
 
@@ -80,57 +79,95 @@ class Events(commands.Cog):
     # TODO: Take in an optional arg, channel to output the event to
     @app_commands.command(name="create-event", description="Creates an event")
     async def create_event(self, interaction: discord.Interaction):
-        # Open create event modal
+        """
+        Create a new event
+        :param interaction: interaction
+        :return: None
+        """
         try:
+            # Open create event modal
             await interaction.response.send_modal(CreateEventModal(interaction.user.id, interaction.user.name, interaction.channel.id))
         except Exception as ex:
-            print(f"Problem occurred: {ex}")
+            print(f"Error with create_event command: {ex}")
+            await interaction.response.send_message("Something when wrong...", empheral=True)
 
     @app_commands.command(name="view-events", description="Displays all events created")
-    async def view_events(self, interaction: discord.Interaction):  # TODO: can add pagination
-        await display_events(interaction, 2, 0)
+    async def view_events(self, interaction: discord.Interaction):
+        """
+        View all scheduled events
+        :param interaction: interaction
+        :return: None
+        """
+        try:
+            await display_events(interaction, 2, 0)
+        except Exception as ex:
+            print(f"Error with view_events command: {ex}")
+            await interaction.response.send_message("Something when wrong...", empheral=True)
 
-
+    # TODO: deprecate?
     # edit events has the option to edit the event
     # first takes in the event id and checks if it exists
     # checks current user is creator of that event
     # then provides options to change
     @app_commands.command(name="edit-event", description="Edits an event")
     async def edit_event(self, interaction: discord.Interaction, event_id: int):
-        result = check_valid_event(event_id)
-        # nothing fetched from database
-        if result is None:
-            await interaction.response.send_message("No such event exists!")
-            return
+        """
+        Edit event
+        :param interaction: interaction
+        :param event_id: id of event to edit
+        :return: None
+        """
+        try:
+            result = check_valid_event(event_id)
+            # nothing fetched from database
+            if result is None:
+                await interaction.response.send_message("No such event exists!", empheral=True)
+                return
 
-        if result[1] != interaction.user.id:
-            await interaction.response.send_message("You are not the creator of this event. Cannot edit event.")
-            return
+            if result[1] != interaction.user.id:
+                await interaction.response.send_message("You are not the creator of this event. Cannot edit event.", empheral=True)
+                return
 
-        await interaction.response.send_modal(EditEventModal(event_id))
+            await interaction.response.send_modal(EditEventModal(event_id))
+        except Exception as ex:
+            print(f"Error with edit_event command: {ex}")
+            await interaction.response.send_message("Something when wrong...", empheral=True)
 
-    # user can rsvp to a specific event (or update their response)
+    # TODO: deprecate?
     @app_commands.command(name="rsvp", description="Say yes/no to an event")
     async def rsvp(self, interaction: discord.Interaction, event_id: int, response: str):
-        result = check_valid_event(event_id)
-        if result is None:  # nothing fetched from database
-            await interaction.response.send_message("No such event exists or invalid event id provided!")
-            return
+        """
+        rsvp to an event
+        :param interaction: interaction
+        :param event_id: id of event
+        :param response: response
+        :return: None
+        """
+        try:
+            result = check_valid_event(event_id)
+            if result is None:  # nothing fetched from database
+                await interaction.response.send_message("No such event exists or invalid event id provided!", empheral=True)
+                return
 
-        if response.lower() != "yes" and response.lower() != "no":
-            await interaction.response.send_message("Invalid response. Please enter yes or no only.")
-            return
-        else:
-            response = response.lower()
+            if response.lower() != "yes" and response.lower() != "no":
+                await interaction.response.send_message("Invalid response. Please enter yes or no only.", empheral=True)
+                return
+            else:
+                response = response.lower()
 
-        fetched = find_rsvp_response(event_id, interaction.user.id)
-        if fetched:
-            update_rsvp(event_id, interaction.user.id, response)
-            await interaction.response.send_message(f"Updated response as **'{response}'** to event **{result[3]}**")
-        else:
-            rsvp(event_id, interaction.user.id, interaction.user.name, response)
-            await interaction.response.send_message(f"Responded **'{response}'** to event **{result[3]}**")
+            fetched = find_rsvp_response(event_id, interaction.user.id)
+            if fetched:
+                update_rsvp(event_id, interaction.user.id, response)
+                await interaction.response.send_message(
+                    f"Updated response as **'{response}'** to event **{result[3]}**", empheral=True)
+            else:
+                rsvp(event_id, interaction.user.id, interaction.user.name, response)
+                await interaction.response.send_message(f"Responded **'{response}'** to event **{result[3]}**", empheral=True)
+        except Exception as ex:
+            print(f"Error with view_events command: {ex}")
+            await interaction.response.send_message("Something when wrong...", empheral=True)
 
+    # TODO: deprecate?
     # check_rsvp provides information about a single event and rsvp responses from people
     @app_commands.command(name='check-event-details', description='Check rsvp responses and details for an event')
     async def checkeventdetails(self, interaction: discord.Interaction, event_id: int):
@@ -161,6 +198,7 @@ class Events(commands.Cog):
 
         await interaction.response.send_message(event_details)
 
+    # TODO: deprecate?
     # cancelevent command cancels an event; needs event id and requires the user who created the event
     @app_commands.command(name="delete-event", description="Deletes an event")
     async def deleteevent(self, interaction: discord.Interaction, event_id: int):

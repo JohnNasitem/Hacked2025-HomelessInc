@@ -13,7 +13,6 @@ import datetime as dt
 from datetime import datetime
 from helper import discord_time
 
-# TODO: add try catch to all user commands
 # TODO: use regex instead of "%Y-%m-%d %I:%M %p", to allow users to flexible time inputs like 3am
 
 
@@ -242,7 +241,7 @@ class Availability(commands.Cog):
     @staticmethod
     def convert_row_to_day(row):
         """
-        Converts a row from the availability table to a Day instnace
+        Converts a row from the availability table to a Day instance
         :param row:
         :return:
         """
@@ -257,9 +256,13 @@ class Availability(commands.Cog):
         :param interaction:
         :return: None
         """
+        try:
+            # Send set availability modal
+            await interaction.response.send_modal(CreateAvailabilityModal())
+        except Exception as ex:
+            print(f"Error with set_availability command: {ex}")
+            await interaction.response.send_message("Something when wrong...", empheral=True)
 
-        # Send set availability modal
-        await interaction.response.send_modal(CreateAvailabilityModal())
 
     @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
     async def get_availability(self, interaction: discord.Interaction, users: str = "", week_num: int = -1, show_overlap_numbers: bool = True):
@@ -271,13 +274,15 @@ class Availability(commands.Cog):
         :param show_overlap_numbers: Show the number of overlaps if multiple users are displayed
         :return: None
         """
-        today_date = datetime.today()
-
-        # Use current week if none is specified
-        if week_num < 0:
-            week_num = int(today_date.strftime("%U"))
-
-        await display_availabilities(self.bot, interaction, users, week_num, today_date.year, show_overlap_numbers)
+        try:
+            today_date = datetime.today()
+            # Use current week if none is specified
+            if week_num < 0:
+                week_num = int(today_date.strftime("%U"))
+            await display_availabilities(self.bot, interaction, users, week_num, today_date.year, show_overlap_numbers)
+        except Exception as ex:
+            print(f"Error with get_availability command: {ex}")
+            await interaction.response.send_message("Something when wrong...", empheral=True)
 
     @app_commands.command(name="edit-availability", description="Edit your availabilities")
     async def edit_availability(self, interaction: discord.Interaction):
@@ -286,7 +291,11 @@ class Availability(commands.Cog):
         :param interaction: interaction
         :return: None
         """
-        await edit_availabilities(interaction, 2, 0)
+        try:
+            await edit_availabilities(interaction, 2, 0)
+        except Exception as ex:
+            print(f"Error with edit_availability command: {ex}")
+            await interaction.response.send_message("Something when wrong...", empheral=True)
 # endregion
 
 async def setup(bot):
