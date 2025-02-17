@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 
 class Ping(commands.Cog):
     def __init__(self, bot):
@@ -7,11 +8,25 @@ class Ping(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        print("Bot is online!")
+        print("Ping is online!")
 
+    @app_commands.command()
+    async def ping(self, interaction: discord.Interaction):
+        latency = self.bot.latency * 1000  # Convert latency to milliseconds
+        await interaction.response.send_message(f"Pong! Latency: {latency:.2f} ms")
+    
     @commands.command()
-    async def ping(self, ctx):
-        await ctx.send("Pong!!")
+    async def sync(self, ctx):
+        """
+        Sync slash commands for the guild
+        """
+        try:
+            synced_commands = await ctx.bot.tree.sync(guild=ctx.guild)
+            await ctx.send(f"Synced {len(synced_commands)} commands")
+            print(f"Synced {len(synced_commands)} commands")
+        except Exception as e:
+            await ctx.send(f"Failed to sync commands: {e}")
+            print(f"Failed to sync commands: {e}")
 
 async def setup(bot):
     await bot.add_cog(Ping(bot))
