@@ -1,13 +1,73 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-import asyncio
-
+from discord.ui import View, Select, Button
 import sqlite3
-import time
 from datetime import datetime, timedelta
+from helper import discord_time
 
-#database = sqlite3.connect("database.db", 10)
+database = sqlite3.connect("database.db", 10)
+
+# TODO: add try catch to all user commands
+# TODO: Tighten the margins for reminders and make hourly task run every 30 mins instead
+# TODO: use regex instead of "%Y-%m-%d %I:%M %p", to allow users to flexible time inputs like 3am
+
+# region Classes
+class EditEventView(View):
+    def __init__(self, event_list, amount, offset):
+        super().__init__()
+        # Handle what data is being shown
+        self.event_list = event_list
+        self.amount = amount
+        self.offset = offset
+
+class NextButton(Button):
+    def __init__(self, view: View):
+        super().__init__(label="Next")
+        self.parent_view = view
+
+        # Disable of the amount of availabilities is less than the display amount
+        if len(view.event_list) <= view.amount:
+            self.disabled = True
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+
+        # Enable previous button
+        self.parent_view.children[0].disabled = False
+        # Increment offset
+        self.parent_view.offset += self.parent_view.amount
+        # Disable next button if it reached the end
+        if len(self.parent_view.event_list) < self.parent_view.offset + self.parent_view.amount:
+            self.disabled = True
+
+        #update options
+        self.parent_view.children[1].options = get_edit_events_options(self.parent_view.event_list, self.parent_view.amount, self.parent_view.offset)
+
+        # Update menu
+        await interaction.edit_original_response(embed=gen_view_events_embed(self.parent_view.event_list, self.parent_view.amount, self.parent_view.offset), view=self.parent_view)
+
+class PreviousButton(Button):
+    def __init__(self, view: View):
+        super().__init__(label="Previous", disabled=True)
+        self.parent_view = view
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+
+        # Enable next button
+        self.parent_view.children[2].disabled = False
+        # Increment offset
+        self.parent_view.offset -= self.parent_view.amount
+        # Disable next button if it reached the end
+        if self.parent_view.offset == 0:
+            self.disabled = True
+
+        # Update options
+        self.parent_view.children[1].options = get_edit_events_options(self.parent_view.event_list, self.parent_view.amount, self.parent_view.offset)
+
+        # Update menu
+        await interaction.edit_original_response(embed=gen_view_events_embed(self.parent_view.event_list, self.parent_view.amount, self.parent_view.offset), view=self.parent_view)
 
 class Events(commands.Cog):
     def __init__(self, bot):
@@ -17,49 +77,29 @@ class Events(commands.Cog):
     async def on_ready(self):
         print("Events is ready!")
 
+    # TODO: Take in an optional arg, channel to output the event to
     @app_commands.command(name="create-event", description="Creates an event")
-    async def createevent(self, interaction: discord.Interaction):
-        event_id = int(time.time() * 1000)
-        creator_id = interaction.user.id
-        creator = interaction.user.name
-        channel_id = interaction.channel.id
-
-        await interaction.response.send_modal(CreateEventModal(event_id, creator_id, creator, channel_id))
+    async def create_event(self, interaction: discord.Interaction):
+        # Open create event modal
+        try:
+            await interaction.response.send_modal(CreateEventModal(interaction.user.id, interaction.user.name, interaction.channel.id))
+        except Exception as ex:
+            print(f"Problem occurred: {ex}")
 
     @app_commands.command(name="view-events", description="Displays all events created")
-    async def viewevents(self, interaction: discord.Interaction):  # TODO: can add pagination
-        # update events appropriately
-        delete_past_events()
-        change_to_ongoing()
-        results = get_events() # fetch query results
+    async def view_events(self, interaction: discord.Interaction):  # TODO: can add pagination
+        await display_events(interaction, 2, 0)
 
-        if results:
-            event_list = ["Here are the created events: "]
-            for idx, result in enumerate(results, 1):  # parse through each row of the result and display it
-                event_list.append( # backticks
-                    f"```"
-                    f"{idx}. ID: {result[0]}\n"
-                    f"Event Name: {result[3]}\n"
-                    f"Created by: {result[2]}\n"
-                    f"Description: {result[4]}\n"
-                    f"Start Time: {result[5]}\n"
-                    f"End Time: {result[6]}\n"
-                    f"Status: {result[7]}"
-                    f"```")
-
-            await  interaction.response.send_message("".join(event_list))
-        else:
-            await interaction.response.send_message("No events found!")
-            return
 
     # edit events has the option to edit the event
     # first takes in the event id and checks if it exists
     # checks current user is creator of that event
     # then provides options to change
     @app_commands.command(name="edit-event", description="Edits an event")
-    async def editevent(self, interaction: discord.Interaction, event_id: int):
+    async def edit_event(self, interaction: discord.Interaction, event_id: int):
         result = check_valid_event(event_id)
-        if result is None:  # nothing fetched from database
+        # nothing fetched from database
+        if result is None:
             await interaction.response.send_message("No such event exists!")
             return
 
@@ -137,7 +177,119 @@ class Events(commands.Cog):
 
         delete_event(event_id)
         await interaction.response.send_message(f"Event **{result[3]}** has been **deleted**.") # result[3] is event name
+# endregion
 
+# TODO: edit to only show 1 page, and use buttons to vote, to go other pages, and add a button if that user is the owner
+async def display_events(interaction: discord.Interaction, amount: int, offset: int):
+    """
+    Display event embed menu
+    :param interaction: interation
+    :param amount: amount of events to display in 1 page
+    :param offset: index offset
+    :return:
+    """
+    # update events appropriately
+    delete_past_events()
+    change_to_ongoing()
+    # fetch query results
+    results = get_events()
+
+    if not results:
+        await interaction.response.send_message("No events found!", ephemeral=True)
+        return
+
+    dropdown = Select(
+        placeholder="Choose an event to edit...",
+        min_values=1,
+        max_values=1,
+        options=get_edit_events_options(results, amount, offset)
+    )
+
+    async def dropdown_callback(interaction_callback: discord.Interaction):
+        """
+        Open a modal dialog when user selects an availability
+        :param interaction_callback: interaction
+        :return: None
+        """
+        await interaction_callback.response.send_message(f"Selected {dropdown.values[0]}", ephemeral=True)
+        # TODO: change to modal
+        #await interaction_callback.response.send_modal(
+        #    EditEventModal(raw_availabilities[int(dropdown.values[0])]))
+
+    # Assign the callback to the dropdown
+    dropdown.callback = dropdown_callback
+
+    view = EditEventView(results, amount, offset)
+    if len(dropdown.options) > 0:
+        view.add_item(PreviousButton(view))
+        view.add_item(dropdown)
+        view.add_item(NextButton(view))
+
+    await interaction.response.send_message(embed=gen_view_events_embed(results, 2, 0), view=view, ephemeral=True)
+
+def gen_view_events_embed(event_list, amount, offset):
+    """
+    Generate an embed from the provided data within the provided range
+    :param event_list: list of events
+    :param amount: how many to display
+    :param offset: starting offset
+    :return: Embed
+    """
+
+    if amount > 25:
+        raise Exception("Amount cannot be larger than 25")
+
+    # parse through each row of the result and display it
+    view_event_embed_menu = discord.Embed(
+        title="All Scheduled Events",
+    )
+    for idx, result in enumerate(event_list, 1):
+        # Ignore any not being displayed
+        if idx < offset + 1:
+            continue
+        if idx == offset + amount + 1:
+            break
+
+        # Add event as embed field
+        datetime_format = "%Y-%m-%d %I:%M %p"
+        start_date = datetime.strptime(result[5], datetime_format)
+        end_date = datetime.strptime(result[6], datetime_format)
+        view_event_embed_menu.add_field(
+            # Name
+            name=f"{idx} - {result[3]}",
+            # Created By: creator \n StartTime - EndTime \n Description \n Status: status
+            value=f"Created by: {result[2]} \n {discord_time(start_date, 'f')} - {discord_time(end_date, 'f')}\nDescription: {result[4]}\nStatus: {result[7]}",
+            inline=False
+        )
+
+    return view_event_embed_menu
+
+def get_edit_events_options(event_list, amount, offset):
+    """
+    Get select options in range from event_list
+    :param event_list: list of events to display
+    :param amount: amount to display
+    :param offset: index offset
+    :return: list of SelectOptions
+    """
+
+    if amount > 25:
+        raise Exception("Amount cannot be larger than 25")
+
+    options = []
+    for idx, result in enumerate(event_list, 1):
+        # Ignore any not being displayed
+        if idx < offset + 1:
+            continue
+        if idx == offset + amount + 1:
+            break
+                                            # Event name
+        options.append(discord.SelectOption(label=f"{idx} - {result[3]}",
+                                            # Creator
+                                            description=f"Created by: {result[2]}",
+                                            value=str(idx)))
+
+    return options
 
 async def send_reminders(bot):
     """
@@ -149,13 +301,16 @@ async def send_reminders(bot):
     print("Sent reminders.")
 
 async def send_early_reminder(bot):
+    """
+    Send a reminder to event participants 24 hours before event starts
+    :param bot: bot
+    :return: None
+    """
     current_datetime = datetime.now()
-    #twenty_four_hours_later = current_datetime + timedelta(hours=24)
-    twenty_four_hours_later = current_datetime + timedelta(minutes=60)
+    twenty_four_hours_later = current_datetime + timedelta(hours=24)
     margin = timedelta(hours=2)
 
     # find events to that start in about 24 hours that are confirmed to happen
-    database = sqlite3.connect("database.db", 10)
     cursor = database.cursor()
     query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Confirmed' AND AlreadyRemindedParticipants = '0'"
     cursor.execute(query, (twenty_four_hours_later - margin, twenty_four_hours_later + margin))
@@ -163,55 +318,56 @@ async def send_early_reminder(bot):
     cursor.close()
     if result:
         for event in result:
-            # Get the default channel (the first text channel in the guild)
-            guild = bot.get_guild(int(event[13]))  # Replace with your guild ID
+            guild = bot.get_guild(int(event[13]))
             if guild:
                 channel_id = event[8]
                 # find the channel where the user originally created the event
                 channel = guild.get_channel(channel_id)
                 if channel:
+                    # TODO: should this ping everyone? a role? or only the people who voted yes?
                     await channel.send(f"Hey @everyone! The event, **{event[3]}**, will occur in 24 hours!")
                     print(f"Reminder for {event[3]} sent.")
 
-                    sub_query = "UPDATE event SET AlreadyRemindedParticipants = '1' WHERE ID = ?"
+                    # set AlreadyRemindedParticipants flag for event
                     cursor = database.cursor()
-                    cursor.execute(sub_query, (event[0],))
+                    cursor.execute("UPDATE event SET AlreadyRemindedParticipants = '1' WHERE ID = ?", (event[0],))
                     database.commit()
                     cursor.close()
                 else:
                     print("Channel not found.")
             else:
                 print("Guild not found.")
-    cursor.close()
-    database.close()
 
-# send reminder when event is starting
 async def send_starting_reminder(bot):
+    """
+    Send an announcement when the event does start
+    :param bot:
+    :return:
+    """
     current_datetime = datetime.now()
     margin = timedelta(hours=2)
 
     # find events to that start in about 24 hours that are confirmed to happen
     query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Confirmed' AND AlreadyAnnounced = '0'"
-    database = sqlite3.connect("database.db", 10)
     cursor = database.cursor()
     cursor.execute(query, (current_datetime - margin, current_datetime + margin))
     result = cursor.fetchall()
     cursor.close()
     if result:
         for event in result:
-            # Get the default channel (the first text channel in the guild)
             guild = bot.get_guild(int(event[13]))  # Replace with your guild ID
             if guild:
                 channel_id = event[8]
                 # find the channel where the user originally created the event
                 channel = guild.get_channel(channel_id)
                 if channel:
+                    # TODO: should this ping everyone? a role? or only the people who voted yes?
                     await channel.send(f"Hey @everyone! The event, **{event[3]}**, is occurring!")
-                    print(f"Reminder for {event[3]} sent.")
+                    print(f"Announcement for {event[3]} sent.")
 
-                    sub_query = "UPDATE event SET AlreadyAnnounced = '1' WHERE ID = ?"
+                    # set AlreadyAnnounced flag for event
                     cursor = database.cursor()
-                    cursor.execute(sub_query, (event[0],))
+                    cursor.execute("UPDATE event SET AlreadyAnnounced = '1' WHERE ID = ?", (event[0],))
                     database.commit()
                     cursor.close()
                 else:
@@ -219,33 +375,32 @@ async def send_starting_reminder(bot):
             else:
                 print("Guild not found.")
     cursor.close()
-    database.close()
-
-# remind creator of event 48 hours before event that their event will be starting
 async def remind_creator(bot):
+    """
+    Remind the creator 48 hours a head of time to confirm the event if it is still pending
+    :param bot: Bot
+    :return: None
+    """
     current_datetime = datetime.now()
-    #forty_eight_hours_later = current_datetime + timedelta(hours=48)
-    forty_eight_hours_later = current_datetime + timedelta(minutes=60)
+    forty_eight_hours_later = current_datetime + timedelta(hours=48)
     margin = timedelta(hours=2)
 
     query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Pending' AND AlreadyRemindedOwner= '0'"
-    database = sqlite3.connect("database.db", 10)
     cursor = database.cursor()
     cursor.execute(query, (forty_eight_hours_later - margin, forty_eight_hours_later + margin))
     result = cursor.fetchall()
     cursor.close()
-    print(result)
     if result:
         for event in result:
-            # Get the default channel (the first text channel in the guild)
             guild = bot.get_guild(int(event[13]))  # Replace with your guild ID
             if guild:
                 user_id = event[1]
                 user = bot.get_user(user_id)
                 if user:
                     await user.send(f"Hey {user.mention}! The event, **{event[3]}** in **{guild.name}** has not been confirmed yet. Please confirm it (via `/edit-event`) so that server members can be notified 24 hours before!")
-                    print(f"Reminder for {event[3]} sent.")
+                    print(f"Reminder for {event[3]} sent to creator.")
 
+                    # set AlreadyRemindedOwner flag for event
                     sub_query = "UPDATE event SET AlreadyRemindedOwner = '1' WHERE ID = ?"
                     cursor = database.cursor()
                     cursor.execute(sub_query, (event[0],))
@@ -256,122 +411,134 @@ async def remind_creator(bot):
             else:
                 print("Guild not found.")
     cursor.close()
-    database.close()
 
 async def setup(bot):
     await bot.add_cog(Events(bot))
 
-# helper functions for commands
-# get_events gets all items from event table in database
+# region database functions
 def get_events():
-    print("In events function") # testing
-    query = "SELECT * FROM event ORDER BY StartTime ASC" # earliest event first
-    database = sqlite3.connect("database.db", 10)
+    """
+    Get all events ordered by start time ascending
+    :return: all event rows
+    """
     cursor = database.cursor()
-    cursor.execute(query)
+    cursor.execute("SELECT * FROM event ORDER BY StartTime ASC" )# earliest event first
     result = cursor.fetchall()
     cursor.close()
-    database.close()
     return result
 
-# check_valid_event fetches event for given id
 def check_valid_event(event_id):
-    query = "SELECT * FROM event WHERE ID = ?"
-    database = sqlite3.connect("database.db", 10)
+    """
+    fetches event for given id.
+    :param event_id: event id
+    :return: event row
+    """
     cursor = database.cursor()
-    cursor.execute(query, (event_id,))
+    cursor.execute("SELECT * FROM event WHERE ID = ?", (event_id,))
     result = cursor.fetchone()
     cursor.close()
-    database.close()
     return result
 
-# delete_event deletes the event with the provided id
 def delete_event(event_id):
-    query = "DELETE FROM event WHERE ID = ?"
-    database = sqlite3.connect("database.db", 10)
+    """
+    Deletes the event with the provided id.
+    :param event_id: id of event to delete
+    :return: None
+    """
     cursor = database.cursor()
-    cursor.execute(query, (event_id,))
+    cursor.execute("DELETE FROM event WHERE ID = ?", (event_id,))
     database.commit()
     cursor.close()
-    database.close()
 
-# called in certain commands to delete any events that have past
 def delete_past_events():
-    current_datetime = datetime.now()
-    query = "DELETE FROM event WHERE EndTime < ?"
-    database = sqlite3.connect("database.db", 10)
+    """
+    Delete any events that have past
+    :return: None
+    """
     cursor = database.cursor()
-    cursor.execute(query, (current_datetime,))
+    cursor.execute("DELETE FROM event WHERE EndTime < ?", (datetime.now(),))
     database.commit()
     cursor.close()
-    database.close()
 
-# called in certain commands to update any events who should be ongoing
 def change_to_ongoing():
-    current_datetime = datetime.now()
-    query = "UPDATE event SET Status = ? WHERE StartTime < ? AND EndTime > ? AND STATUS = 'Confirmed'"
-    database = sqlite3.connect("database.db", 10)
+    """
+    Update any events who should be ongoing
+    :return: None
+    """
     cursor = database.cursor()
-    cursor.execute(query, ("Ongoing", current_datetime, current_datetime))
+    cursor.execute("UPDATE event SET Status = ? WHERE StartTime < ? AND EndTime > ? AND STATUS = 'Confirmed'", ("Ongoing", datetime.now(), datetime.now()))
     database.commit()
     cursor.close()
-    database.close()
 
-# cancel_event cancels the event with the provided id
 def cancel_event(event_id):
-    query = "UPDATE event SET Status = ? WHERE ID = ?"
-    database = sqlite3.connect("database.db", 10)
+    """
+    Cancels the event with the provided id.
+    :param event_id: id of event to cancel
+    :return: None
+    """
     cursor = database.cursor()
-    cursor.execute(query, ("Cancelled", event_id))
+    cursor.execute("UPDATE event SET Status = ? WHERE ID = ?", ("Cancelled", event_id))
     database.commit()
     cursor.close()
-    database.close()
 
 def find_rsvp_response(event_id, user_id):
-    query = "SELECT Response FROM rsvp WHERE EventID = ? AND UserID = ?"
-    database = sqlite3.connect("database.db", 10)
+    """
+    Get rsvp response from a user for an event
+    :param event_id: id of event
+    :param user_id: id of user
+    :return: Response row
+    """
     cursor = database.cursor()
-    cursor.execute(query, (event_id, user_id))
+    cursor.execute("SELECT Response FROM rsvp WHERE EventID = ? AND UserID = ?", (event_id, user_id))
     result = cursor.fetchone()
     cursor.close()
-    database.close()
     return result
 
 def rsvp(event_id, user_id, user_name, response):
-    query = "INSERT INTO rsvp VALUES (?, ?, ?, ?)"
-    database = sqlite3.connect("database.db", 10)
+    """
+    Rsvp a user to an event
+    :param event_id: id of event
+    :param user_id: id of user
+    :param user_name: username of user
+    :param response: users response
+    :return: None
+    """
     cursor = database.cursor()
-    cursor.execute(query, (event_id, user_id, user_name, response))
+    cursor.execute("INSERT INTO rsvp VALUES (?, ?, ?, ?)", (event_id, user_id, user_name, response))
     database.commit()
     cursor.close()
-    database.close()
 
 def update_rsvp(event_id, user_id, response):
-    query = "UPDATE rsvp SET Response = ? WHERE EventID = ? AND UserID = ?"
-    database = sqlite3.connect("database.db", 10)
+    """
+    Update a users rsvp to an event
+    :param event_id: id of event
+    :param user_id: id of user
+    :param response: new response
+    :return: None
+    """
     cursor = database.cursor()
-    cursor.execute(query, (response, event_id, user_id))
+    cursor.execute("UPDATE rsvp SET Response = ? WHERE EventID = ? AND UserID = ?", (response, event_id, user_id))
     database.commit()
     cursor.close()
-    database.close()
 
 def fetch_rsvp_response(event_id, response):
-    query = "SELECT User FROM rsvp WHERE Response = ? AND EventID = ?"
-    database = sqlite3.connect("database.db", 10)
+    """
+    Get all users who rsvped for the event
+    :param event_id: id of event
+    :param response: what response to filter for
+    :return: count, list of user ids
+    """
     cursor = database.cursor()
-    cursor.execute(query, (response, event_id))
+    cursor.execute("SELECT User FROM rsvp WHERE Response = ? AND EventID = ?", (response, event_id))
     result = cursor.fetchall()
-    user_ids = [row[0] for row in result]
-    count = len(user_ids)
+    user_ids = list([row[0] for row in result])
     cursor.close()
-    database.close()
-    return count, user_ids
+    return len(user_ids), user_ids
+# endregion
 
-# modal to create event
 class CreateEventModal(discord.ui.Modal, title="Create Event"):
-    def __init__(self, event_id: int, creator_id: int, creator: str, channel_id: int):
+    def __init__(self, creator_id: int, creator: str, channel_id: int):
         super().__init__()
-        self.event_id = event_id
         self.creator_id = creator_id
         self.creator = creator
         self.status = "Not set"
@@ -381,9 +548,9 @@ class CreateEventModal(discord.ui.Modal, title="Create Event"):
         self.name = discord.ui.TextInput(label="Event Name", style=discord.TextStyle.short, required=True)
         self.description = discord.ui.TextInput(label="Event Description", style=discord.TextStyle.paragraph,
                                                 required=False)
-        self.start_time = discord.ui.TextInput(label="Start Time (YYYY-MM-DD HH:MM)", style=discord.TextStyle.short,
+        self.start_time = discord.ui.TextInput(label="Start Time (YYYY-MM-DD HH:MM AM/PM)", style=discord.TextStyle.short,
                                                required=True)
-        self.end_time = discord.ui.TextInput(label="End Time (YYYY-MM-DD HH:MM)", style=discord.TextStyle.short,
+        self.end_time = discord.ui.TextInput(label="End Time (YYYY-MM-DD HH:MM AM/PM)", style=discord.TextStyle.short,
                                              required=True)
 
         # Add components to the modal
@@ -394,20 +561,19 @@ class CreateEventModal(discord.ui.Modal, title="Create Event"):
 
     async def on_submit(self, interaction: discord.Interaction):
         # check if datetime was inserted properly
-        datetime_format = "%Y-%m-%d %H:%M"  # no seconds
+        datetime_format = "%Y-%m-%d %I:%M %p"
         try:
             # check start_time and end_time are in correct date_time format
             start_time = datetime.strptime(self.start_time.value, datetime_format)
             end_time = datetime.strptime(self.end_time.value, datetime_format)
             if start_time > end_time:
-                await interaction.response.send_message("Start time must be before end time!")
+                await interaction.response.send_message("Start time must be before end time!", ephemeral=True)
                 return
             elif start_time == end_time:
-                await interaction.response.send_message("Start time and end time cannot be the same!")
+                await interaction.response.send_message("Start time and end time cannot be the same!", ephemeral=True)
                 return
         except ValueError:
-            await interaction.response.send_message(
-                f"Incorrect datetime format, should be {datetime_format}, like 2025-02-14 15:30, or incorrect datetime values inputted")
+            await interaction.response.send_message( f"Incorrect datetime format, should be {datetime_format}, like 2025-02-14 15:30, or incorrect datetime values inputted" , ephemeral=True)
             return
 
         status_options = ["Pending", "Ongoing"]
@@ -417,18 +583,24 @@ class CreateEventModal(discord.ui.Modal, title="Create Event"):
         elif current_datetime < end_time:
             self.status = status_options[1]
         else:
-            await interaction.response.send_message("Invalid event time! Cannot create event in the past.")
+            await interaction.response.send_message("Invalid event time! Cannot create event in the past.", ephemeral=True)
             return
 
         try:
-            query = "INSERT INTO event VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            database = sqlite3.connect("database.db", 10)
+            query = """
+            INSERT INTO event (CreatorID, Creator, Name, Description, StartTime, EndTime, Status, ChannelID, AlreadyRemindedOwner, AlreadyRemindedParticipants, AlreadyAnnounced, GUILDID)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
             cursor = database.cursor()
-            cursor.execute(query, (self.event_id, self.creator_id, self.creator, self.name.value, self.description.value, self.start_time.value, self.end_time.value, self.status, self.channel_id, "0", "0", "0", interaction.guild.id))
+            cursor.execute(query, (self.creator_id, self.creator, self.name.value, self.description.value, self.start_time.value, self.end_time.value, self.status, self.channel_id, "0", "0", "0", interaction.guild.id))
             database.commit()
             cursor.close()
-            database.close()
-            await interaction.response.send_message(f"Event `{self.event_id}` created successfully!")
+            start_date = datetime.strptime(self.start_time.value, datetime_format)
+            end_date = datetime.strptime(self.end_time.value, datetime_format)
+            await interaction.response.send_message(embed=discord.Embed(
+                title="Sucessfully created event!",
+                description=f"Event Name: **{self.name.value}**\nCreated by: {self.creator} \n {discord_time(start_date, 'f')} - {discord_time(end_date, 'f')}\nDescription: {self.description.value}\nStatus: {self.status}",
+            ), ephemeral=True)
         except Exception as e:
             await interaction.response.send_message(f"Error updating event: {str(e)}", ephemeral=True)
 
@@ -438,7 +610,7 @@ class EditEventModal(discord.ui.Modal, title="Edit Event"):
         super().__init__()
         self.event_id = event_id
 
-        event = self.get_event_details(event_id)
+        event = self.get_event_details()
 
         self.name = discord.ui.TextInput(label="Event Name", style=discord.TextStyle.short, required=True, default=event['name'])
         self.description = discord.ui.TextInput(label="Event Description", style=discord.TextStyle.paragraph,
@@ -457,14 +629,15 @@ class EditEventModal(discord.ui.Modal, title="Edit Event"):
         self.add_item(self.end_time)
         self.add_item(self.status)
 
-    def get_event_details(self, event_id: int):
-        query = "SELECT * FROM event WHERE ID = ?"
-        database = sqlite3.connect("database.db", 10)
+    def get_event_details(self):
+        """
+        Get event details
+        :return: Event entry related to this event id
+        """
         cursor = database.cursor()
-        cursor.execute(query, (event_id,))
+        cursor.execute("SELECT * FROM event WHERE ID = ?", (self.event_id,))
         result = cursor.fetchone()
         cursor.close()
-        database.close()
 
         if result:
             return {
@@ -485,14 +658,14 @@ class EditEventModal(discord.ui.Modal, title="Edit Event"):
             start_time = datetime.strptime(self.start_time.value, datetime_format)
             end_time = datetime.strptime(self.end_time.value, datetime_format)
             if start_time > end_time:
-                await interaction.response.send_message("Start time must be before end time!")
+                await interaction.response.send_message("Start time must be before end time!", ephemeral=True)
                 return
             elif start_time == end_time:
-                await interaction.response.send_message("Start time and end time cannot be the same!")
+                await interaction.response.send_message("Start time and end time cannot be the same!", ephemeral=True)
                 return
         except ValueError:
             await interaction.response.send_message(
-                f"Incorrect datetime format, should be {datetime_format}, like 2025-02-14 15:30, or incorrect datetime values inputted")
+                f"Incorrect datetime format, should be {datetime_format}, like 2025-02-14 15:30, or incorrect datetime values inputted", ephemeral=True)
             return
 
         # check if status was entered properly
@@ -504,19 +677,17 @@ class EditEventModal(discord.ui.Modal, title="Edit Event"):
         elif status == "pending":
             self.status = "Pending"
         else:
-            await interaction.response.send_message(
-                f"Invalid status. Please enter one of the following: Pending, Confirmed, Cancelled")
+            await interaction.response.send_message(f"Invalid status. Please enter one of the following: Pending, Confirmed, Cancelled", ephemeral=True)
             return
 
         try:
-            database = sqlite3.connect("database.db", 10)
             cursor = database.cursor()
             query = "UPDATE event SET Name = ?, Description = ?, StartTime = ?, EndTime = ?, Status = ? WHERE ID = ?"
             cursor.execute(query, (self.name.value, self.description.value, self.start_time.value, self.end_time.value, self.status, self.event_id))
             database.commit()
             cursor.close()
-            database.close()
-            await interaction.response.send_message(f"Event `{self.event_id}` updated successfully!")
+            await interaction.response.send_message(f"Event `{self.event_id}` updated successfully!", ephemeral=True)
+            # TODO: Make edits to original message with new changes
         except Exception as e:
             await interaction.response.send_message(f"Error updating event: {str(e)}", ephemeral=True)
 
