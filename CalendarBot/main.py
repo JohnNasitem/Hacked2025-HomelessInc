@@ -16,8 +16,7 @@ class Client(commands.Bot):
 
         # sync slash commands
         try:
-            guild = discord.Object(id=1340369941001539636)
-            synced_commands = await self.tree.sync(guild=guild)
+            synced_commands = await self.tree.sync()
             print(f"Synced {len(synced_commands)} commands")
         except Exception as e:
             print(f"Failed to sync commands: {e}")
