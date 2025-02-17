@@ -1,8 +1,8 @@
-import discord
 from discord.ext import commands
 import sqlite3
 
-database = sqlite3.connect("database.db")
+# Database connection
+database = sqlite3.connect("database.db", 10)
 
 class Database(commands.Cog):
     def __init__(self, bot):
@@ -14,9 +14,14 @@ class Database(commands.Cog):
 
     @commands.command()
     async def reset_database(self, ctx):
+        """
+        Reset all database tables
+        :param ctx: context
+        :return: None
+        """
         # Setting it to only work for Eatdatpizza for now
-        #if ctx.author.id != 357657793215332357:
-        #    return
+        if ctx.author.id != 357657793215332357:
+            return
 
         status = "Attempting to reset tables..."
 
@@ -56,9 +61,13 @@ def reset_availability():
                                  )""")
 
 def reset_events():
+    """
+    Reset event table
+    :return: None
+    """
     database.execute("DROP TABLE IF EXISTS event")
     database.execute("""CREATE TABLE IF NOT EXISTS event(
-                                 ID INTEGER PRIMARY KEY, 
+                                 ID INTEGER PRIMARY KEY AUTOINCREMENT, 
                                  CreatorID INTEGER,
                                  Creator TEXT,
                                  Name TEXT NOT NULL,
@@ -74,6 +83,10 @@ def reset_events():
                                  )""")
 
 def reset_rsvp():
+    """
+    Reset rsvp table
+    :return: None
+    """
     database.execute("DROP TABLE IF EXISTS rsvp")
     database.execute("""CREATE TABLE IF NOT EXISTS rsvp(
                                  EventID INTEGER,
@@ -85,21 +98,23 @@ def reset_rsvp():
                                  )""")
 
 def create_missing_tables():
+    """
+    Create any missing tables
+    :return:
+    """
     cursor = database.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name= ?", ("availability",))
 
     if not cursor.fetchone():
         print("availability was missing. Created a new one")
         reset_availability()
-    cursor.close()
-    cursor = database.cursor()
+
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name= ?", ("event",))
 
     if not cursor.fetchone():
         print("event was missing. Created a new one")
         reset_events()
-    cursor.close()
-    cursor = database.cursor()
+
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name= ?", ("rsvp",))
 
     if not cursor.fetchone():

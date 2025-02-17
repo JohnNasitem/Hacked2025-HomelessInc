@@ -1,35 +1,31 @@
 import datetime
 import discord
+from discord.ext import commands
+from discord import app_commands
+from discord.ui import View, Select, Button
+from PIL import Image, ImageDraw, ImageFont
+from dateutil.relativedelta import relativedelta
 import re
 import random
-from discord.ext import commands
-from discord import app_commands, Interaction
-from discord.ui import View, Select, Button
-from PIL import Image, ImageDraw, ImageFont # pip install Pillow
-from dateutil.relativedelta import relativedelta # pip install python-dateutil
 import os
 import sqlite3
 import datetime as dt
 from datetime import datetime
+from helper import discord_time
 
-#database = sqlite3.connect("database.db", 10)
+# TODO: add try catch to all user commands
+# TODO: use regex instead of "%Y-%m-%d %I:%M %p", to allow users to flexible time inputs like 3am
 
+
+# Database connection
+database = sqlite3.connect("database.db", 10)
+cursor = database.cursor()
+
+# Image settings
 col_header_font = ImageFont.truetype("arial.ttf", 45)
 row_header_font = ImageFont.truetype("arial.ttf", 30)
-days_of_week = [ "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-time_regex_string = r"(\d\d?):(\d\d) (am|pm)"
 
-def discordTime(date_time, format=None):
-    """
-    Convert date_time to a discord timestamp
-    """
-    if format is None:
-        return f"<t:{int(datetime.timestamp(date_time))}>" 
-    if format == "t":
-        return f"<t:{int(datetime.timestamp(date_time))}:t>"
-    if format == "D":
-        return f"<t:{int(datetime.timestamp(date_time))}:D>"
-
+# region Classes
 class CreateAvailabilityModal(discord.ui.Modal, title="Create Availability"):
     def __init__(self):
         super().__init__()
@@ -46,6 +42,7 @@ class CreateAvailabilityModal(discord.ui.Modal, title="Create Availability"):
         self.add_item(self.recurring)
 
     async def on_submit(self, modal_interaction: discord.Interaction):
+        # key to value
         recurring_dict = {
             'false': 'false',  # No recurrence
             'd': 'daily',  # Daily recurrence
@@ -60,18 +57,21 @@ class CreateAvailabilityModal(discord.ui.Modal, title="Create Availability"):
             start_time = self.start_time.value.lower()
             end_time = self.end_time.value.lower()
             recurring = recurring_dict[self.recurring.value.lower()]
+
             # create datetime objects for start and end to simplify
             start_date = datetime.strptime(f"{day} {start_time}", "%Y-%m-%d %I:%M %p")
             end_date = datetime.strptime(f"{day} {end_time}", "%Y-%m-%d %I:%M %p")
 
-            if start_date.timestamp() > end_date.timestamp():  # Check if start time is before end time
+            # Check if start time is before end time
+            if start_date.timestamp() > end_date.timestamp():
                 raise Exception("Start time cannot be after end time.")
 
+            # Add availability to database
             db_add_availability(modal_interaction.user.id, day, start_time, end_time, recurring)
 
             await modal_interaction.response.send_message(embed=discord.Embed(
                 title="Successfully set availability!",
-                description=f"Date: {discordTime(start_date, 'D')}\nTime: {discordTime(start_date, 't')} - {discordTime(end_date, 't')}\nRecurring: {recurring}",
+                description=f"Date: {discord_time(start_date, 'D')}\nTime: {discord_time(start_date, 't')} - {discord_time(end_date, 't')}\nRecurring: {recurring}",
                 color=modal_interaction.user.colour
             ), ephemeral=True)
         except KeyError:
@@ -91,9 +91,10 @@ class CreateAvailabilityModal(discord.ui.Modal, title="Create Availability"):
 class EditAvailabilityModal(discord.ui.Modal, title="Edit Availability"):
     def __init__(self, old_row):
         self.old_row = old_row
-        user_id, date, start_time, end_time, recurring = old_row  # unpack the tuple
+        user_id, date, start_time, end_time, recurring = old_row
         super().__init__()
-        # Inputs
+
+        # Inputs - prepopulate with existing values
         self.date = discord.ui.TextInput(label="Date (YYYY-MM-DD)", style=discord.TextStyle.short, required=True, default=date)
         self.start_time = discord.ui.TextInput(label="Start Time (HH:MM AM/PM)", style=discord.TextStyle.short,required=True, default=start_time)
         self.end_time = discord.ui.TextInput(label="End Time (HH:MM AM/PM)", style=discord.TextStyle.short,required=True, default=end_time)
@@ -108,6 +109,7 @@ class EditAvailabilityModal(discord.ui.Modal, title="Edit Availability"):
         self.add_item(self.should_delete)
 
     async def on_submit(self, modal_interaction: discord.Interaction):
+        # Key to value
         recurring_dict = {
             'false': 'false',  # No recurrence
             'd': 'daily',  # Daily recurrence
@@ -115,32 +117,38 @@ class EditAvailabilityModal(discord.ui.Modal, title="Edit Availability"):
             'm': 'monthly',  # Monthly recurrence
             'y': 'yearly'  # Yearly recurrence
         }
-        user_id, old_date, old_start_time, old_end_time, old_recurring = self.old_row  # unpack the tuple
+        user_id, old_date, old_start_time, old_end_time, old_recurring = self.old_row
 
         try:
+            # Check if user wants to delete the availability
             if self.should_delete.value.lower() == "yes":
                 db_delete_availability(self.old_row)
                 await modal_interaction.response.send_message("Successfully deleted availability!", ephemeral=True)
                 return
+
+
             # Extract data from input fields
             day = self.date.value.lower()
             start_time = self.start_time.value.lower()
             end_time = self.end_time.value.lower()
             recurring = recurring_dict[self.recurring.value.lower()]
+
             # create datetime objects for start and end to simplify
             start_date = datetime.strptime(f"{day} {start_time}", "%Y-%m-%d %I:%M %p")
             end_date = datetime.strptime(f"{day} {end_time}", "%Y-%m-%d %I:%M %p")
             old_start_date = datetime.strptime(f"{old_date} {old_start_time}", "%Y-%m-%d %I:%M %p")
             old_end_date = datetime.strptime(f"{old_date} {old_end_time}", "%Y-%m-%d %I:%M %p")
 
-            if start_date.timestamp() > end_date.timestamp():  # Check if start time is before end time
+            # Check if start time is before end time
+            if start_date.timestamp() > end_date.timestamp():
                 raise Exception("Start time cannot be after end time.")
 
+            # Push edit changes to db
             db_edit_availability(self.old_row, (modal_interaction.user.id, day, start_time, end_time, recurring))
 
             await modal_interaction.response.send_message(embed=discord.Embed(
                 title="Successfully edited availability!",
-                description=f"Date: {discordTime(old_start_date, 'D')} -> {discordTime(start_date, 'D')}\nTime: {discordTime(old_start_date, 't')} - {discordTime(old_end_date, 't')} -> {discordTime(start_date, 't')} - {discordTime(end_date, 't')}\nRecurring: {old_recurring} -> {recurring}",
+                description=f"Date: {discord_time(old_start_date, 'D')} -> {discord_time(start_date, 'D')}\nTime: {discord_time(old_start_date, 't')} - {discord_time(old_end_date, 't')} -> {discord_time(start_date, 't')} - {discord_time(end_date, 't')}\nRecurring: {old_recurring} -> {recurring}",
                 color=modal_interaction.user.colour
             ), ephemeral=True)
         except KeyError:
@@ -160,6 +168,7 @@ class EditAvailabilityModal(discord.ui.Modal, title="Edit Availability"):
 class EditAvailabilityView(View):
     def __init__(self, raw_availabilities, amount, offset):
         super().__init__()
+        # Handle what data is being shown
         self.raw_availabilities = raw_availabilities
         self.amount = amount
         self.offset = offset
@@ -169,20 +178,17 @@ class NextButton(Button):
         super().__init__(label="Next")
         self.parent_view = view
 
+        # Disable of the amount of availabilities is less than the display amount
         if len(view.raw_availabilities) <= view.amount:
             self.disabled = True
 
     async def callback(self, interaction: discord.Interaction):
-        print("Button pressed")
         await interaction.response.defer()
+
         # Enable previous button
         self.parent_view.children[0].disabled = False
-
         # Increment offset
         self.parent_view.offset += self.parent_view.amount
-
-        print(f'offset: {self.parent_view.offset} - amount: {self.parent_view.amount}')
-
         # Disable next button if it reached the end
         if len(self.parent_view.raw_availabilities) < self.parent_view.offset + self.parent_view.amount:
             self.disabled = True
@@ -190,6 +196,7 @@ class NextButton(Button):
         #update options
         self.parent_view.children[1].options = get_edit_availabilities_options(self.parent_view.raw_availabilities, self.parent_view.amount, self.parent_view.offset)
 
+        # Update menu
         await interaction.edit_original_response(embed=gen_edit_availabilities_embed(self.parent_view.raw_availabilities, self.parent_view.amount, self.parent_view.offset), view=self.parent_view)
 
 class PreviousButton(Button):
@@ -198,24 +205,20 @@ class PreviousButton(Button):
         self.parent_view = view
 
     async def callback(self, interaction: discord.Interaction):
-        print("Button pressed")
-
         await interaction.response.defer()
+
         # Enable next button
         self.parent_view.children[2].disabled = False
-
         # Increment offset
         self.parent_view.offset -= self.parent_view.amount
-
-        print(f'offset: {self.parent_view.offset} - amount: {self.parent_view.amount}')
-
         # Disable next button if it reached the end
         if self.parent_view.offset == 0:
             self.disabled = True
 
-        # update options
+        # Update options
         self.parent_view.children[1].options = get_edit_availabilities_options(self.parent_view.raw_availabilities, self.parent_view.amount, self.parent_view.offset)
 
+        # Update menu
         await interaction.edit_original_response(embed=gen_edit_availabilities_embed(self.parent_view.raw_availabilities, self.parent_view.amount, self.parent_view.offset), view=self.parent_view)
 
 class Day:
@@ -238,6 +241,11 @@ class Availability(commands.Cog):
 
     @staticmethod
     def convert_row_to_day(row):
+        """
+        Converts a row from the availability table to a Day instnace
+        :param row:
+        :return:
+        """
         result_user_id, availability_date, start_time, end_time, recurring = row
         dt_date = datetime.strptime(availability_date, '%Y-%m-%d')
         return Day(result_user_id, dt_date.strftime('%Y-%m-%d'), start_time, end_time)
@@ -246,13 +254,11 @@ class Availability(commands.Cog):
     async def set_availability(self, interaction: discord.Interaction):
         """
         Set the availability for a specific time period
-
-        Returns:
-            (userID, day, start_time, end_time) if the message is in the correct format
-            None otherwise
-
-        shouts out to chris for getting slash commands to work
+        :param interaction:
+        :return: None
         """
+
+        # Send set availability modal
         await interaction.response.send_modal(CreateAvailabilityModal())
 
     @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
@@ -267,8 +273,10 @@ class Availability(commands.Cog):
         """
         today_date = datetime.today()
 
+        # Use current week if none is specified
         if week_num < 0:
             week_num = int(today_date.strftime("%U"))
+
         await display_availabilities(self.bot, interaction, users, week_num, today_date.year, show_overlap_numbers)
 
     @app_commands.command(name="edit-availability", description="Edit your availabilities")
@@ -279,9 +287,24 @@ class Availability(commands.Cog):
         :return: None
         """
         await edit_availabilities(interaction, 2, 0)
+# endregion
 
 async def setup(bot):
     await bot.add_cog(Availability(bot))
+
+# def discord_time(date_time, format=None):
+#     """
+#     Convert date_time to a unix timestamp
+#     :param date_time:datetime to convert
+#     :param format: format used
+#     :return: Unix time stamp
+#     """
+#     if format is None:
+#         return f"<t:{int(datetime.timestamp(date_time))}>"
+#     if format == "t":
+#         return f"<t:{int(datetime.timestamp(date_time))}:t>"
+#     if format == "D":
+#         return f"<t:{int(datetime.timestamp(date_time))}:D>"
 
 def gen_edit_availabilities_embed(raw_availabilities, amount, offset):
     """
@@ -300,7 +323,9 @@ def gen_edit_availabilities_embed(raw_availabilities, amount, offset):
         description="Please select an availability to edit",
     )
 
+    # Convert any rows that in range into a embed field
     for index, result in enumerate(raw_availabilities):
+        # Ignore any not being displayed
         if index < offset:
             continue
         if index == offset + amount:
@@ -313,22 +338,30 @@ def gen_edit_availabilities_embed(raw_availabilities, amount, offset):
         end = datetime.strptime(f"{date} {end_time}", "%Y-%m-%d %I:%M %p")
 
         edit_embed_menu.add_field(
-            name=f"{index + 1} {discordTime(start, 'D')}",
-            value=f"{discordTime(start, 't')} to {discordTime(end, 't')}",
+            name=f"{index + 1} {discord_time(start, 'D')}",
+            value=f"{discord_time(start, 't')} to {discord_time(end, 't')}",
             inline=False
         )
 
     return edit_embed_menu
 
 def get_edit_availabilities_options(raw_availabilities, amount, offset):
+    """
+    Get select options in range from raw_availabilities
+    :param raw_availabilities: availabilities to get data from
+    :param amount: amount to display
+    :param offset: index offset
+    :return: list of SelectOptions
+    """
     options = []
     for index, result in enumerate(raw_availabilities):
+        # Ignore any not in range
         if index < offset:
             continue
         if index == offset + amount:
             break
 
-        user_id, date, start_time, end_time, recurring = result  # unpack the tuple
+        user_id, date, start_time, end_time, recurring = result
 
         # create datetime objects for start and end to simplify
         start = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %I:%M %p")
@@ -340,16 +373,38 @@ def get_edit_availabilities_options(raw_availabilities, amount, offset):
     return options
 
 async def edit_availabilities(interaction: discord.Interaction, amount: int, offset: int):
+    """
+    Display edit menu
+    :param interaction: Interation
+    :param amount: amount of availabilities to display
+    :param offset: index offset
+    :return: None
+    """
     try:
+        # Get all availabilities related to the user
         raw_availabilities = db_get_availability(interaction.user.id)
+
+        # Display empty embed if user has no availabilities
+        if len(raw_availabilities) == 0:
+            interaction.response.send_message(embed=discord.Embed(
+                title="Edit Availabilities",
+                description="No availabilities to edit.",
+            ), ephemeral=True)
+            return
+
         dropdown = Select(
-            placeholder="Choose an option...",  # Placeholder text when no selection is made
-            min_values=1,  # Minimum number of selections
-            max_values=1,  # Maximum number of selections
+            placeholder="Choose an availability to edit...",
+            min_values=1,
+            max_values=1,
             options=get_edit_availabilities_options(raw_availabilities, amount, offset)
         )
 
         async def dropdown_callback(interaction_callback: discord.Interaction):
+            """
+            Open a modal dialog when user selects an availability
+            :param interaction_callback: interaction
+            :return: None
+            """
             await interaction_callback.response.send_modal(EditAvailabilityModal(raw_availabilities[int(dropdown.values[0])]))
 
         # Assign the callback to the dropdown
@@ -403,6 +458,7 @@ async def display_availabilities(bot, interaction: discord.Interaction, user_str
                 except discord.NotFound:
                     print(f'{possible_id} is an invalid user id')
 
+        # Get database entries for each selected user
         unfiltered_availabilities_list = []
         if users:
             for t_user in users:
@@ -427,6 +483,7 @@ async def display_availabilities(bot, interaction: discord.Interaction, user_str
             if start_str <= converted_availability.date <= end_str:
                 filtered_availabilities_list.append(converted_availability)
 
+            # Add recurring availabilities
             if recurring == "daily":
                 for i in range(7):
                     new_date = datetime.strptime(converted_availability.date if start_str <= converted_availability.date <= end_str else start_str, "%Y-%m-%d") + dt.timedelta(days=i)
@@ -456,7 +513,7 @@ async def display_availabilities(bot, interaction: discord.Interaction, user_str
                         filtered_availabilities_list.append(Day(converted_availability.user_id, new_date[0], converted_availability.start_time, converted_availability.end_time))
 
 
-
+        # Create schedule image and display it
         await create_image(bot, filtered_availabilities_list, week_dates, show_numbers)
         with open('generated_images/schedule.png', 'rb') as f:
             await interaction.response.send_message(f"Availabilities:", file=discord.File(f))
@@ -489,12 +546,14 @@ async def create_image(bot, week_data, week_dates, show_overlap_count = True):
                 if abs(r_int - g_int) > 30 or abs(r_int - b_int) > 30 or abs(g_int - b_int) > 30 and not (r_int > 200 and 210 < g_int > 150 and b_int < 100):
                     return r_int, g_int, b_int
 
+        # Populate colour dictionary until each user id has one
         colour_dict = {}
         incr = 0
         while len(colour_dict) != len(user_ids):
             r, g, b = generate_light_color()
             color = (r, g, b, 128)
 
+            # Don't include duplicates
             if color in colour_dict:
                 continue
 
@@ -527,15 +586,18 @@ async def create_image(bot, week_data, week_dates, show_overlap_count = True):
         time_i += 0 if time_match.group(2) == "00" else 1
         return time_i
 
+    # Sort week data by date
     week_data = sorted(week_data, key = lambda wd: wd.date)
-
-    background_width = 2300
 
     # Get unique ids and count
     unique_ids = get_unique_ids()
     unique_id_count = len(unique_ids)
 
+    days_of_week = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    time_regex_string = r"(\d\d?):(\d\d) (am|pm)"
+
     # Get colour table
+    background_width = 2300
     colour_table = generate_colour_table(unique_ids)
     image_size = background_width if len(colour_table) < 2 else background_width + 400, 2500
     # Generates the white background
@@ -631,6 +693,9 @@ async def create_image(bot, week_data, week_dates, show_overlap_count = True):
     # Save and show the result
     background.save('generated_images/schedule.png')
 
+
+
+# region Database functions
 def db_add_availability(user_id, date, start_date_time, end_date_time, recurring):
     """
     Add availability to database
@@ -642,12 +707,8 @@ def db_add_availability(user_id, date, start_date_time, end_date_time, recurring
     """
     try:
         query = "INSERT INTO availability VALUES (?, ?, ?, ?, ?)"
-        database = sqlite3.connect("database.db", 10)
-        cursor = database.cursor()
         cursor.execute(query, (user_id, date, start_date_time, end_date_time, recurring))
         database.commit()
-        cursor.close()
-        database.cursor()
     except Exception as ex:
         print(f"problem\n{ex}")
 
@@ -658,12 +719,8 @@ def db_get_availability(user_id):
     :return: all the related availabilities
     """
     query = "SELECT * FROM availability WHERE USERID = ?"
-    database = sqlite3.connect("database.db", 10)
-    cursor = database.cursor()
     cursor.execute(query, (user_id,))
     result = cursor.fetchall()
-    cursor.close()
-    database.close()
     return result
 
 def db_get_all_availabilities():
@@ -672,12 +729,8 @@ def db_get_all_availabilities():
     :return: list of tuples
     """
     query = "SELECT * FROM availability"
-    database = sqlite3.connect("database.db", 10)
-    cursor = database.cursor()
     cursor.execute(query)
     result = cursor.fetchall()
-    cursor.close()
-    database.close()
     return result
 
 def db_edit_availability(old_row, new_row):
@@ -693,12 +746,8 @@ def db_edit_availability(old_row, new_row):
         query = """UPDATE availability 
                    SET AVAILABILITYDATE = ?, StartTime = ?, EndTime = ?,  RECURRING = ?
                    WHERE USERID = ? and AVAILABILITYDATE = ? and StartTime = ? and EndTime = ? and RECURRING = ?"""
-        database = sqlite3.connect("database.db", 10)
-        cursor = database.cursor()
         cursor.execute(query, (new_date, new_start_time, new_end_time, new_recurring, *old_row))
         database.commit()
-        cursor.close()
-        database.close()
     except Exception as ex:
         print(f"Problem with updating database\n{ex}")
 
@@ -711,12 +760,8 @@ def db_delete_availability(row):
     try:
         query = """DELETE FROM availability 
                    WHERE USERID = ? and AVAILABILITYDATE = ? and StartTime = ? and EndTime = ? and RECURRING = ?"""
-        database = sqlite3.connect("database.db", 10)
-        cursor = database.cursor()
         cursor.execute(query, row)
         database.commit()
-        cursor.close()
-        database.close()
     except Exception as ex:
         print(f"Problem with deleting entry\n{ex}")
 
@@ -735,3 +780,4 @@ def db_clean_up_old():
 
     for result_to_remove in availabilities_to_remove:
         db_delete_availability(result_to_remove)
+# endregion
