@@ -10,18 +10,17 @@ load_dotenv()
 class Client(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.tree = app_commands.CommandTree(self)
 
     async def on_ready(self):
         print(f'Logged in as {self.user}')
 
         # sync slash commands
-        try:
-            guild = discord.Object(id=1340369941001539636)
-            synced_commands = await self.tree.sync(guild=guild)
-            print(f"Synced {len(synced_commands)} commands")
-        except Exception as e:
-            print(f"Failed to sync commands: {e}")
+        # apparently the bot gets rate limited if syncing is in on_ready so manually run !sync
+        # try:
+        #     synced_commands = await self.tree.sync()
+        #     print(f"Synced {len(synced_commands)} commands")
+        # except Exception as e:
+        #     print(f"Failed to sync commands: {e}")
 
 TOKEN = os.getenv("BOT_TOKEN")
 intents = discord.Intents.all()
