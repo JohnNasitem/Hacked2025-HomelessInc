@@ -7,8 +7,7 @@ import sqlite3
 import time
 from datetime import datetime, timedelta
 
-database = sqlite3.connect("database.db")
-cursor = database.cursor()
+#database = sqlite3.connect("database.db", 10)
 
 class Events(commands.Cog):
     def __init__(self, bot):
@@ -149,16 +148,19 @@ async def send_reminders(bot):
     await remind_creator(bot)
     print("Sent reminders.")
 
-
 async def send_early_reminder(bot):
     current_datetime = datetime.now()
-    twenty_four_hours_later = current_datetime + timedelta(hours=24)
-    margin = timedelta(minutes=5)
+    #twenty_four_hours_later = current_datetime + timedelta(hours=24)
+    twenty_four_hours_later = current_datetime + timedelta(minutes=60)
+    margin = timedelta(hours=2)
 
     # find events to that start in about 24 hours that are confirmed to happen
-    query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Confirmed'"
+    database = sqlite3.connect("database.db", 10)
+    cursor = database.cursor()
+    query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Confirmed' AND AlreadyRemindedParticipants = '0'"
     cursor.execute(query, (twenty_four_hours_later - margin, twenty_four_hours_later + margin))
     result = cursor.fetchall()
+    cursor.close()
     if result:
         for event in result:
             # Get the default channel (the first text channel in the guild)
@@ -170,20 +172,30 @@ async def send_early_reminder(bot):
                 if channel:
                     await channel.send(f"Hey @everyone! The event, **{event[3]}**, will occur in 24 hours!")
                     print(f"Reminder for {event[3]} sent.")
+
+                    sub_query = "UPDATE event SET AlreadyRemindedParticipants = '1' WHERE ID = ?"
+                    cursor = database.cursor()
+                    cursor.execute(sub_query, (event[0],))
+                    cursor.close()
                 else:
                     print("Channel not found.")
             else:
                 print("Guild not found.")
+    cursor.close()
+    database.close()
 
 # send reminder when event is starting
 async def send_starting_reminder(bot):
     current_datetime = datetime.now()
-    margin = timedelta(minutes=5)
+    margin = timedelta(hours=2)
 
     # find events to that start in about 24 hours that are confirmed to happen
-    query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Confirmed'"
+    query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Confirmed' AND AlreadyAnnounced = '0'"
+    database = sqlite3.connect("database.db", 10)
+    cursor = database.cursor()
     cursor.execute(query, (current_datetime - margin, current_datetime + margin))
     result = cursor.fetchall()
+    cursor.close()
     if result:
         for event in result:
             # Get the default channel (the first text channel in the guild)
@@ -195,20 +207,31 @@ async def send_starting_reminder(bot):
                 if channel:
                     await channel.send(f"Hey @everyone! The event, **{event[3]}**, is occurring!")
                     print(f"Reminder for {event[3]} sent.")
+
+                    sub_query = "UPDATE event SET AlreadyAnnounced = '1' WHERE ID = ?"
+                    cursor = database.cursor()
+                    cursor.execute(sub_query, (event[0],))
+                    cursor.close()
                 else:
                     print("Channel not found.")
             else:
                 print("Guild not found.")
+    cursor.close()
+    database.close()
 
 # remind creator of event 48 hours before event that their event will be starting
 async def remind_creator(bot):
     current_datetime = datetime.now()
-    forty_eight_hours_later = current_datetime + timedelta(hours=48)
-    margin = timedelta(minutes=5)
+    #forty_eight_hours_later = current_datetime + timedelta(hours=48)
+    forty_eight_hours_later = current_datetime + timedelta(minutes=60)
+    margin = timedelta(hours=2)
 
-    query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Pending'"
+    query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Pending' AND AlreadyRemindedOwner= '0'"
+    database = sqlite3.connect("database.db", 10)
+    cursor = database.cursor()
     cursor.execute(query, (forty_eight_hours_later - margin, forty_eight_hours_later + margin))
     result = cursor.fetchall()
+    cursor.close()
     print(result)
     if result:
         for event in result:
@@ -220,10 +243,17 @@ async def remind_creator(bot):
                 if user:
                     await user.send(f"Hey {user.mention}! The event, **{event[3]}** in **{guild.name}** has not been confirmed yet. Please confirm it (via `/edit-event`) so that server members can be notified 24 hours before!")
                     print(f"Reminder for {event[3]} sent.")
+
+                    sub_query = "UPDATE event SET AlreadyRemindedOwner = '1' WHERE ID = ?"
+                    cursor = database.cursor()
+                    cursor.execute(sub_query, (event[0],))
+                    cursor.close()
                 else:
                     print("User not found.")
             else:
                 print("Guild not found.")
+    cursor.close()
+    database.close()
 
 async def setup(bot):
     await bot.add_cog(Events(bot))
@@ -233,65 +263,105 @@ async def setup(bot):
 def get_events():
     print("In events function") # testing
     query = "SELECT * FROM event ORDER BY StartTime ASC" # earliest event first
+    database = sqlite3.connect("database.db", 10)
+    cursor = database.cursor()
     cursor.execute(query)
     result = cursor.fetchall()
+    cursor.close()
+    database.close()
     return result
 
 # check_valid_event fetches event for given id
 def check_valid_event(event_id):
     query = "SELECT * FROM event WHERE ID = ?"
+    database = sqlite3.connect("database.db", 10)
+    cursor = database.cursor()
     cursor.execute(query, (event_id,))
     result = cursor.fetchone()
+    cursor.close()
+    database.close()
     return result
 
 # delete_event deletes the event with the provided id
 def delete_event(event_id):
     query = "DELETE FROM event WHERE ID = ?"
+    database = sqlite3.connect("database.db", 10)
+    cursor = database.cursor()
     cursor.execute(query, (event_id,))
     database.commit()
+    cursor.close()
+    database.close()
 
 # called in certain commands to delete any events that have past
 def delete_past_events():
     current_datetime = datetime.now()
     query = "DELETE FROM event WHERE EndTime < ?"
+    database = sqlite3.connect("database.db", 10)
+    cursor = database.cursor()
     cursor.execute(query, (current_datetime,))
     database.commit()
+    cursor.close()
+    database.close()
 
 # called in certain commands to update any events who should be ongoing
 def change_to_ongoing():
     current_datetime = datetime.now()
-    query = "UPDATE event SET Status = ? WHERE StartTime < ? AND EndTime > ? AND STATUS = 'Confirmed'" # FIXME only when status is confirmed
+    query = "UPDATE event SET Status = ? WHERE StartTime < ? AND EndTime > ? AND STATUS = 'Confirmed'"
+    database = sqlite3.connect("database.db", 10)
+    cursor = database.cursor()
     cursor.execute(query, ("Ongoing", current_datetime, current_datetime))
     database.commit()
+    cursor.close()
+    database.close()
 
 # cancel_event cancels the event with the provided id
 def cancel_event(event_id):
     query = "UPDATE event SET Status = ? WHERE ID = ?"
+    database = sqlite3.connect("database.db", 10)
+    cursor = database.cursor()
     cursor.execute(query, ("Cancelled", event_id))
     database.commit()
+    cursor.close()
+    database.close()
 
 def find_rsvp_response(event_id, user_id):
     query = "SELECT Response FROM rsvp WHERE EventID = ? AND UserID = ?"
+    database = sqlite3.connect("database.db", 10)
+    cursor = database.cursor()
     cursor.execute(query, (event_id, user_id))
     result = cursor.fetchone()
+    cursor.close()
+    database.close()
     return result
 
 def rsvp(event_id, user_id, user_name, response):
     query = "INSERT INTO rsvp VALUES (?, ?, ?, ?)"
+    database = sqlite3.connect("database.db", 10)
+    cursor = database.cursor()
     cursor.execute(query, (event_id, user_id, user_name, response))
     database.commit()
+    cursor.close()
+    database.close()
 
 def update_rsvp(event_id, user_id, response):
     query = "UPDATE rsvp SET Response = ? WHERE EventID = ? AND UserID = ?"
+    database = sqlite3.connect("database.db", 10)
+    cursor = database.cursor()
     cursor.execute(query, (response, event_id, user_id))
     database.commit()
+    cursor.close()
+    database.close()
 
 def fetch_rsvp_response(event_id, response):
     query = "SELECT User FROM rsvp WHERE Response = ? AND EventID = ?"
+    database = sqlite3.connect("database.db", 10)
+    cursor = database.cursor()
     cursor.execute(query, (response, event_id))
     result = cursor.fetchall()
     user_ids = [row[0] for row in result]
     count = len(user_ids)
+    cursor.close()
+    database.close()
     return count, user_ids
 
 # modal to create event
@@ -348,9 +418,13 @@ class CreateEventModal(discord.ui.Modal, title="Create Event"):
             return
 
         try:
-            query = "INSERT INTO event VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            cursor.execute(query, (self.event_id, self.creator_id, self.creator, self.name.value, self.description.value, self.start_time.value, self.end_time.value, self.status, self.channel_id))
+            query = "INSERT INTO event VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            database = sqlite3.connect("database.db", 10)
+            cursor = database.cursor()
+            cursor.execute(query, (self.event_id, self.creator_id, self.creator, self.name.value, self.description.value, self.start_time.value, self.end_time.value, self.status, self.channel_id, "0", "0", "0"))
             database.commit()
+            cursor.close()
+            database.close()
             await interaction.response.send_message(f"Event `{self.event_id}` created successfully!")
         except Exception as e:
             await interaction.response.send_message(f"Error updating event: {str(e)}", ephemeral=True)
@@ -382,8 +456,12 @@ class EditEventModal(discord.ui.Modal, title="Edit Event"):
 
     def get_event_details(self, event_id: int):
         query = "SELECT * FROM event WHERE ID = ?"
+        database = sqlite3.connect("database.db", 10)
+        cursor = database.cursor()
         cursor.execute(query, (event_id,))
         result = cursor.fetchone()
+        cursor.close()
+        database.close()
 
         if result:
             return {
@@ -428,9 +506,13 @@ class EditEventModal(discord.ui.Modal, title="Edit Event"):
             return
 
         try:
+            database = sqlite3.connect("database.db", 10)
+            cursor = database.cursor()
             query = "UPDATE event SET Name = ?, Description = ?, StartTime = ?, EndTime = ?, Status = ? WHERE ID = ?"
             cursor.execute(query, (self.name.value, self.description.value, self.start_time.value, self.end_time.value, self.status, self.event_id))
             database.commit()
+            cursor.close()
+            database.close()
             await interaction.response.send_message(f"Event `{self.event_id}` updated successfully!")
         except Exception as e:
             await interaction.response.send_message(f"Error updating event: {str(e)}", ephemeral=True)

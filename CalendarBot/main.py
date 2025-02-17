@@ -5,7 +5,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from discord import app_commands
 from cogs.availabilities import db_clean_up_old
-from cogs.database import reset_availability
+from cogs.database import reset_availability, create_missing_tables
 from cogs.events import send_reminders
 from sqlite3 import OperationalError
 
@@ -25,6 +25,8 @@ class Client(commands.Bot):
         except Exception as e:
             print(f"Failed to sync commands: {e}")
 
+        create_missing_tables()
+
         self.loop.create_task(self.hourly_task())
 
     async def hourly_task(self):
@@ -39,13 +41,12 @@ class Client(commands.Bot):
             try:
                 db_clean_up_old()
                 print("Cleaned up old availabilities")
-            except OperationalError as op_ex:
-                if op_ex == "no such table: availability":
-                    reset_availability()
+            except Exception as ex:
+                print(f"Couldn't clean up availabilities\n{ex}")
 
             await send_reminders(self)
             # Wait for an hour (3600 seconds) before running again
-            await asyncio.sleep(3600)
+            await asyncio.sleep(10)
 
 TOKEN = os.getenv("BOT_TOKEN")
 intents = discord.Intents.all()

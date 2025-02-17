@@ -12,8 +12,7 @@ import sqlite3
 import datetime as dt
 from datetime import datetime
 
-database = sqlite3.connect("database.db")
-cursor = database.cursor()
+#database = sqlite3.connect("database.db", 10)
 
 col_header_font = ImageFont.truetype("arial.ttf", 45)
 row_header_font = ImageFont.truetype("arial.ttf", 30)
@@ -643,8 +642,12 @@ def db_add_availability(user_id, date, start_date_time, end_date_time, recurring
     """
     try:
         query = "INSERT INTO availability VALUES (?, ?, ?, ?, ?)"
+        database = sqlite3.connect("database.db", 10)
+        cursor = database.cursor()
         cursor.execute(query, (user_id, date, start_date_time, end_date_time, recurring))
         database.commit()
+        cursor.close()
+        database.cursor()
     except Exception as ex:
         print(f"problem\n{ex}")
 
@@ -655,8 +658,13 @@ def db_get_availability(user_id):
     :return: all the related availabilities
     """
     query = "SELECT * FROM availability WHERE USERID = ?"
+    database = sqlite3.connect("database.db", 10)
+    cursor = database.cursor()
     cursor.execute(query, (user_id,))
-    return cursor.fetchall()
+    result = cursor.fetchall()
+    cursor.close()
+    database.close()
+    return result
 
 def db_get_all_availabilities():
     """
@@ -664,8 +672,13 @@ def db_get_all_availabilities():
     :return: list of tuples
     """
     query = "SELECT * FROM availability"
+    database = sqlite3.connect("database.db", 10)
+    cursor = database.cursor()
     cursor.execute(query)
-    return cursor.fetchall()
+    result = cursor.fetchall()
+    cursor.close()
+    database.close()
+    return result
 
 def db_edit_availability(old_row, new_row):
     """
@@ -680,8 +693,12 @@ def db_edit_availability(old_row, new_row):
         query = """UPDATE availability 
                    SET AVAILABILITYDATE = ?, StartTime = ?, EndTime = ?,  RECURRING = ?
                    WHERE USERID = ? and AVAILABILITYDATE = ? and StartTime = ? and EndTime = ? and RECURRING = ?"""
+        database = sqlite3.connect("database.db", 10)
+        cursor = database.cursor()
         cursor.execute(query, (new_date, new_start_time, new_end_time, new_recurring, *old_row))
         database.commit()
+        cursor.close()
+        database.close()
     except Exception as ex:
         print(f"Problem with updating database\n{ex}")
 
@@ -694,8 +711,12 @@ def db_delete_availability(row):
     try:
         query = """DELETE FROM availability 
                    WHERE USERID = ? and AVAILABILITYDATE = ? and StartTime = ? and EndTime = ? and RECURRING = ?"""
+        database = sqlite3.connect("database.db", 10)
+        cursor = database.cursor()
         cursor.execute(query, row)
         database.commit()
+        cursor.close()
+        database.close()
     except Exception as ex:
         print(f"Problem with deleting entry\n{ex}")
 
