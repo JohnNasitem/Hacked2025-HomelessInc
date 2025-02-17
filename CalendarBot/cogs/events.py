@@ -9,6 +9,7 @@ from datetime import datetime
 database = sqlite3.connect("database.db")
 cursor = database.cursor()
 database.execute("DROP TABLE IF EXISTS event")
+database.execute("DROP TABLE IF EXISTS rsvp")
 # create event table
 database.execute("""CREATE TABLE IF NOT EXISTS event(
                  ID INTEGER PRIMARY KEY, 
@@ -20,7 +21,14 @@ database.execute("""CREATE TABLE IF NOT EXISTS event(
                  EndTime DATETIME,
                  Status TEXT
                  )""")
-
+database.execute("""CREATE TABLE IF NOT EXISTS rsvp(
+                 EventID INTEGER,
+                 UserID INTEGER,
+                 User TEXT,
+                 Response TEXT,
+                 PRIMARY KEY(EventID, UserID),
+                 FOREIGN KEY(EventID) REFERENCES event(ID) ON DELETE CASCADE
+                 )""")
 
 class Events(commands.Cog):
     def __init__(self, bot):
@@ -51,13 +59,14 @@ class Events(commands.Cog):
                 event_list.append( # backticks
                     f"```"
                     f"{idx}. ID: {result[0]}\n"
-                    f"   Name: {result[3]} by {result[2]}\n"
-                    f"   Description: {result[4]}\n"
-                    f"   Start Time: {result[5]}\n"
-                    f"   End Time: {result[6]}\n"
-                    f"   Status: {result[7]}"
-                    f"```"
-                )
+                    f"Event Name: {result[3]}\n"
+                    f"Created by: {result[2]}\n"
+                    f"Description: {result[4]}\n"
+                    f"Start Time: {result[5]}\n"
+                    f"End Time: {result[6]}\n"
+                    f"Status: {result[7]}"
+                    f"```")
+
             await  interaction.response.send_message("".join(event_list))
         else:
             await interaction.response.send_message("No events found!")
@@ -80,14 +89,57 @@ class Events(commands.Cog):
 
         await interaction.response.send_modal(EditEventModal(event_id))
 
-    # @commands.command() # test command for followup messages
-    # async def followup(self, ctx):
-    #     await ctx.send("plz say something")
-    #     def check(message):
-    #         return message.author == ctx.author and message.channel == ctx.channel
-    #     msg = await self.bot.wait_for('message', check=check)
-    #     await ctx.send(f"hey {msg.author}, you said {msg.content}")
+    # user can rsvp to a specific event (or update their response)
+    @app_commands.command(name="rsvp", description="Say yes/no to an event")
+    async def rsvp(self, interaction: discord.Interaction, event_id: int, response: str):
+        result = check_valid_event(event_id)
+        if result is None:  # nothing fetched from database
+            await interaction.response.send_message("No such event exists or invalid event id provided!")
+            return
 
+        if response.lower() != "yes" and response.lower() != "no":
+            await interaction.response.send_message("Invalid response. Please enter yes or no only.")
+            return
+        else:
+            response = response.lower()
+
+        fetched = find_rsvp_response(event_id, interaction.user.id)
+        if fetched:
+            update_rsvp(event_id, interaction.user.id, response)
+            await interaction.response.send_message(f"Updated response as **'{response}'** to event **{result[3]}**")
+        else:
+            rsvp(event_id, interaction.user.id, interaction.user.name, response)
+            await interaction.response.send_message(f"Responded **'{response}'** to event **{result[3]}**")
+
+    # check_rsvp provides information about a single event and rsvp responses from people
+    @app_commands.command(name='check-event-details', description='Check rsvp responses and details for an event')
+    async def checkeventdetails(self, interaction: discord.Interaction, event_id: int):
+        result = check_valid_event(event_id)
+        if result is None:  # nothing fetched from database
+            await interaction.response.send_message("No such event exists or invalid event id provided!")
+            return
+
+        yes_count, yes_users = fetch_rsvp_response(event_id, 'yes')
+        no_count, no_users = fetch_rsvp_response(event_id, 'no')
+        yes_user_name = ', '.join(f"{user_id}" for user_id in yes_users) if yes_users else "No users yet."
+        no_user_name = ', '.join(f"{user_id}" for user_id in no_users) if no_users else "No users yet."
+
+        event_details = (f"```"
+                 f"ID: {result[0]}\n"
+                 f"Event Name: {result[3]}\n"
+                 f"Created by: {result[2]}\n"
+                 f"Description: {result[4]}\n"
+                 f"Start Time: {result[5]}\n"
+                 f"End Time: {result[6]}\n"
+                 f"Status: {result[7]}\n"
+                 f"Yes count: {yes_count}\n"
+                 f"No count: {no_count}\n"
+                 f"Users who RSVP'd Yes: {yes_user_name}\n"
+                 f"Users who RSVP'd No: {no_user_name}"        
+                 f"```"
+        )
+
+        await interaction.response.send_message(event_details)
 
     # cancelevent command cancels an event; needs event id and requires the user who created the event
     @app_commands.command(name="delete-event", description="Deletes an event")
@@ -107,6 +159,7 @@ class Events(commands.Cog):
         await interaction.response.send_message(f"Event **{result[3]}** has been **deleted**.") # result[3] is event name
 
 
+
 async def setup(bot):
     await bot.add_cog(Events(bot))
 
@@ -114,7 +167,7 @@ async def setup(bot):
 # get_events gets all items from event table in database
 def get_events():
     print("In events function") # testing
-    query = "SELECT * FROM event"
+    query = "SELECT * FROM event ORDER BY StartTime ASC" # earliest event first
     cursor.execute(query)
     result = cursor.fetchall()
     return result
@@ -142,15 +195,47 @@ def delete_past_events():
 # called in certain commands to update any events who should be ongoing
 def change_to_ongoing():
     current_datetime = datetime.now()
-    query = "UPDATE event SET Status = ? WHERE StartTime < ? AND EndTime > ?" # FIXME only when status is confirmed
+    query = "UPDATE event SET Status = ? WHERE StartTime < ? AND EndTime > ? AND STATUS = 'Confirmed'" # FIXME only when status is confirmed
     cursor.execute(query, ("Ongoing", current_datetime, current_datetime))
     database.commit()
+
+# TODO add more changing status logic
 
 # cancel_event cancels the event with the provided id
 def cancel_event(event_id):
     query = "UPDATE event SET Status = ? WHERE ID = ?"
     cursor.execute(query, ("Cancelled", event_id))
     database.commit()
+
+def find_rsvp_response(event_id, user_id):
+    query = "SELECT Response FROM rsvp WHERE EventID = ? AND UserID = ?"
+    cursor.execute(query, (event_id, user_id))
+    result = cursor.fetchone()
+    return result
+
+def rsvp(event_id, user_id, user_name, response):
+    query = "INSERT INTO rsvp VALUES (?, ?, ?, ?)"
+    cursor.execute(query, (event_id, user_id, user_name, response))
+    database.commit()
+
+def update_rsvp(event_id, user_id, response):
+    query = "UPDATE rsvp SET Response = ? WHERE EventID = ? AND UserID = ?"
+    cursor.execute(query, (response, event_id, user_id))
+    database.commit()
+
+def fetch_rsvp_response(event_id, response):
+    query = "SELECT User FROM rsvp WHERE Response = ? AND EventID = ?"
+    cursor.execute(query, (response, event_id))
+    result = cursor.fetchall()
+    user_ids = [row[0] for row in result]
+    count = len(user_ids)
+    return count, user_ids
+
+# def rsvp_no(event_id):
+#     query = "SELECT COUNT(*) FROM rsvp WHERE Response = 'no' AND EventID = ?"
+#     cursor.execute(query, (event_id,))
+#     result = cursor.fetchone()
+#     return result[0]
 
 # modal to create event
 class CreateEventModal(discord.ui.Modal, title="Create Event"):
