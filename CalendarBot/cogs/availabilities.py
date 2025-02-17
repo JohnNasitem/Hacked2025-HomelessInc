@@ -292,20 +292,6 @@ class Availability(commands.Cog):
 async def setup(bot):
     await bot.add_cog(Availability(bot))
 
-# def discord_time(date_time, format=None):
-#     """
-#     Convert date_time to a unix timestamp
-#     :param date_time:datetime to convert
-#     :param format: format used
-#     :return: Unix time stamp
-#     """
-#     if format is None:
-#         return f"<t:{int(datetime.timestamp(date_time))}>"
-#     if format == "t":
-#         return f"<t:{int(datetime.timestamp(date_time))}:t>"
-#     if format == "D":
-#         return f"<t:{int(datetime.timestamp(date_time))}:D>"
-
 def gen_edit_availabilities_embed(raw_availabilities, amount, offset):
     """
     Generate an embed from the provided data within the provided range
