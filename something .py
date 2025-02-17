@@ -5,8 +5,7 @@ import random
 from discord.ext import commands
 from discord import app_commands
 from discord.ui import View, Select
-from PIL import Image, ImageDraw, ImageFont # pip install Pillow
-from dateutil.relativedelta import relativedelta # pip install python-dateutil
+from PIL import Image, ImageDraw, ImageFont
 import os
 import sqlite3
 import datetime as dt
@@ -39,24 +38,6 @@ def discordTime(date_time, format=None):
         return f"<t:{int(datetime.timestamp(date_time))}:t>"
     if format == "D":
         return f"<t:{int(datetime.timestamp(date_time))}:D>"
-
-
-class ModifyAvailabilityModal(discord.ui.Modal):
-    def __init__(self, title: str, date: str, start_time: str, end_time: str):
-        super().__init__()
-        self.title = title
-        self.date_val = date
-        self.start_time_val = start_time
-        self.end_time_val = end_time
-
-        self.date_val = discord.ui.TextInput(label="Date (YYYY-MM-DD)", style=discord.TextStyle.short, required=True)
-        self.start_time = discord.ui.TextInput(label="Start Time (HH:MM AM/PM)", style=discord.TextStyle.short,required=True)
-        self.end_time = discord.ui.TextInput(label="End Time (HH:MM AM/PM)", style=discord.TextStyle.short,required=True)
-
-        # Add components to the modal
-        self.add_item(self.date_val)
-        self.add_item(self.start_time)
-        self.add_item(self.end_time)
 
 
 class Day:
@@ -153,6 +134,7 @@ class Availability(commands.Cog):
             await interaction.response.send_message(content=f"{exception} Please provide the times in the following format: YYYY-MM-DD HH:MM AM/PM", ephemeral=True)
             return None
 
+
     @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
     async def get_availability(self, interaction: discord.Interaction, user_str: str = "", week_num: int = -1):
         """
@@ -176,60 +158,26 @@ class Availability(commands.Cog):
         :return: None
         """
 
-        edit_embed_menu = discord.Embed(
+        edit_embed = discord.Embed(
             title = "Edit Availabilities",
             description = "Please select an availability to edit",
             color = interaction.user.colour
         )
 
-        options = []
-        raw_availabilities = db_get_availability(interaction.user.id)
-
-        for index,result in enumerate(raw_availabilities):
+        # displaying available availabilities
+        for index,result in enumerate(db_get_availability(interaction.user.id)):
             user_id, date, start_time, end_time, recurring = result  # unpack the tuple
 
             # create datetime objects for start and end to simplify
             start = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %I:%M %p")
             end = datetime.strptime(f"{date} {end_time}", "%Y-%m-%d %I:%M %p")
 
-            edit_embed_menu.add_field(
+            edit_embed.add_field(
                 name = f"{index + 1} {discordTime(start, 'D')}",
                 value = f"{discordTime(start, 't')} to {discordTime(end, 't')}",    
                 inline=False
             )
-
-            options.append(discord.SelectOption(label=f"{index + 1}. {start.strftime("%b %d %Y")}", description=f"{start.strftime("%I:%M %p")} to {end.strftime("%I:%M %p")}", value=str(index)))
-
-        dropdown = Select(
-            placeholder="Choose an option...",  # Placeholder text when no selection is made
-            min_values=1,  # Minimum number of selections
-            max_values=1,  # Maximum number of selections
-            options=options  # The list of options
-        )
-
-        async def dropdown_callback(interaction_callback: discord.Interaction):
-            if interaction_callback.user.id != interaction.user.id:
-                return
-            selected_option = dropdown.values[0]
-            cb_user_id, cb_date, cb_start_time, cb_end_time, cb_recurring = raw_availabilities[int(selected_option)]
-
-            edit_embed = discord.Embed(
-                title=f"Editting {start.strftime("%b %d %Y")}",
-                description="Please select an availability to edit",
-                color=interaction.user.colour
-            )
-
-
-            await interaction_callback.response.send_message(f"You selected: {selected_option}", ephemeral=True)
-
-        # Assign the callback to the dropdown
-        dropdown.callback = dropdown_callback
-
-        view = View()
-        if len(options) > 0:
-            view.add_item(dropdown)
-
-        await interaction.response.send_message(embed=edit_embed_menu, view=view, ephemeral=True)
+        await interaction.response.send_message(embed=edit_embed, ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Availability(bot))
@@ -276,59 +224,21 @@ async def display_availabilities(bot, interaction: discord.Interaction, user_str
         if users:
             for t_user in users:
                 for result in db_get_availability(t_user.id):
-                    unfiltered_availabilities_list.append(result)
+                    unfiltered_availabilities_list.append(Availability.convert_row_to_day(result))
         # If users is empty then that means everyone should be considered
         else:
             for result in db_get_all_availabilities():
-                unfiltered_availabilities_list.append(result)
+                unfiltered_availabilities_list.append(Availability.convert_row_to_day(result))
 
         # Filter out any availabilities not happening this week
         filtered_availabilities_list = []
-        for raw_availability in unfiltered_availabilities_list:
-            # Convert to Day
-            converted_availability = Availability.convert_row_to_day(raw_availability)
-            # Un-package the raw data
-            result_user_id, availability_date, start_time, end_time, recurring = raw_availability
-            #start and end strings
-            start_str, end_str = week_dates[0].strftime('%Y-%m-%d'), week_dates[6].strftime('%Y-%m-%d')
-
-            # Check if the exact date is within the range
-            if start_str <= converted_availability.date <= end_str:
-                filtered_availabilities_list.append(converted_availability)
-
-            if recurring == "daily":
-                for i in range(7):
-                    new_date = datetime.strptime(converted_availability.date if start_str <= converted_availability.date <= end_str else start_str, "%Y-%m-%d") + dt.timedelta(days=i)
-                    if new_date.strftime("%Y-%m-%d") == converted_availability.date:
-                        continue
-                    if new_date.strftime("%Y-%m-%d") > end_str:
-                        break
-                    filtered_availabilities_list.append(Day(converted_availability.user_id, new_date.strftime("%Y-%m-%d"), converted_availability.start_time, converted_availability.end_time))
-            elif recurring == "weekly":
-                if not start_str <= converted_availability.date <= end_str:
-                    new_date = [date.strftime("%Y-%m-%d") for date in week_dates if (date - datetime.strptime(converted_availability.date, "%Y-%m-%d").date()).days % 7 == 0][0]
-                    filtered_availabilities_list.append(Day(converted_availability.user_id, new_date, converted_availability.start_time, converted_availability.end_time))
-            elif recurring == "monthly":
-                if not start_str <= converted_availability.date <= end_str:
-                    new_date = [date.strftime("%Y-%m-%d") for date in week_dates
-                                if relativedelta(date, datetime.strptime(converted_availability.date, "%Y-%m-%d").date()).days == 0
-                                and relativedelta(date, datetime.strptime(converted_availability.date, "%Y-%m-%d").date()).months >= 1]
-                    if len(new_date) > 0:
-                        filtered_availabilities_list.append(Day(converted_availability.user_id, new_date[0], converted_availability.start_time, converted_availability.end_time))
-            elif recurring == "yearly":
-                if not start_str <= converted_availability.date <= end_str:
-                    new_date = [date.strftime("%Y-%m-%d") for date in week_dates
-                                if relativedelta(date, datetime.strptime(converted_availability.date, "%Y-%m-%d").date()).days == 0
-                                and relativedelta(date, datetime.strptime(converted_availability.date, "%Y-%m-%d").date()).months == 0
-                                and relativedelta(date, datetime.strptime(converted_availability.date, "%Y-%m-%d").date()).years >= 1]
-                    if len(new_date) > 0:
-                        filtered_availabilities_list.append(Day(converted_availability.user_id, new_date[0], converted_availability.start_time, converted_availability.end_time))
-
-
+        for availability in unfiltered_availabilities_list:
+            if week_dates[0].strftime('%Y-%m-%d') <= availability.date <= week_dates[6].strftime('%Y-%m-%d'):
+                filtered_availabilities_list.append(availability)
 
         await create_image(bot, filtered_availabilities_list, week_dates)
         with open('generated_images/schedule.png', 'rb') as f:
-            await interaction.response.send_message(f"Availabilities:", file=discord.File(f))
+            await interaction.response.send_message(f"Availabilities>", file=discord.File(f))
     except Exception as ex:
         await interaction.response.send_message(f"Something went wrong:\n{ex}")
 
