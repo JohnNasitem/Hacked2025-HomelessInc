@@ -176,6 +176,7 @@ async def send_early_reminder(bot):
                     sub_query = "UPDATE event SET AlreadyRemindedParticipants = '1' WHERE ID = ?"
                     cursor = database.cursor()
                     cursor.execute(sub_query, (event[0],))
+                    database.commit()
                     cursor.close()
                 else:
                     print("Channel not found.")
@@ -211,6 +212,7 @@ async def send_starting_reminder(bot):
                     sub_query = "UPDATE event SET AlreadyAnnounced = '1' WHERE ID = ?"
                     cursor = database.cursor()
                     cursor.execute(sub_query, (event[0],))
+                    database.commit()
                     cursor.close()
                 else:
                     print("Channel not found.")
@@ -247,6 +249,7 @@ async def remind_creator(bot):
                     sub_query = "UPDATE event SET AlreadyRemindedOwner = '1' WHERE ID = ?"
                     cursor = database.cursor()
                     cursor.execute(sub_query, (event[0],))
+                    database.commit()
                     cursor.close()
                 else:
                     print("User not found.")
