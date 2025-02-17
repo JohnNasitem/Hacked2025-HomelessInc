@@ -130,7 +130,6 @@ class Availability(commands.Cog):
             await interaction.response.send_message(f"{exception} Please provide the times in the following format: YYYY-MM-DD HH:MM AM/PM")
             return None
 
-
     @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
     async def get_availability(self, interaction: discord.Interaction, user_str: str = "", week_num: int = -1):
         """
