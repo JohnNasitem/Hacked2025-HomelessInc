@@ -36,6 +36,24 @@ def discordTime(date_time):
     return f"<t:{int(datetime.timestamp(date_time))}>" 
 
 
+class ModifyAvailabilityModal(discord.ui.Modal):
+    def __init__(self, title: str, date: str, start_time: str, end_time: str):
+        super().__init__()
+        self.title = title
+        self.date_val = date
+        self.start_time_val = start_time
+        self.end_time_val = end_time
+
+        self.date_val = discord.ui.TextInput(label="Date (YYYY-MM-DD)", style=discord.TextStyle.short, required=True)
+        self.start_time = discord.ui.TextInput(label="Start Time (HH:MM AM/PM)", style=discord.TextStyle.short,required=True)
+        self.end_time = discord.ui.TextInput(label="End Time (HH:MM AM/PM)", style=discord.TextStyle.short,required=True)
+
+        # Add components to the modal
+        self.add_item(self.date_val)
+        self.add_item(self.start_time)
+        self.add_item(self.end_time)
+
+
 class Day:
     """
     Holds an availability slot on the selected day for a specific user
@@ -153,26 +171,60 @@ class Availability(commands.Cog):
         :return: None
         """
 
-        edit_embed = discord.Embed(
+        edit_embed_menu = discord.Embed(
             title = "Edit Availabilities",
             description = "Please select an availability to edit",
             color = interaction.user.colour
         )
 
-        for index,result in enumerate(db_get_availability(interaction.user.id)):
+        options = []
+        raw_availabilities = db_get_availability(interaction.user.id)
+
+        for index,result in enumerate(raw_availabilities):
             user_id, date, start_time, end_time, recurring = result  # unpack the tuple
 
             # create datetime objects for start and end to simplify
             start = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %I:%M %p")
             end = datetime.strptime(f"{date} {end_time}", "%Y-%m-%d %I:%M %p")
 
-            edit_embed.add_field(
+            edit_embed_menu.add_field(
                 name = f"{index + 1} <t:{int(start.timestamp())}:D>",
                 value = f"<t:{int(start.timestamp())}:t> to <t:{int(end.timestamp())}:t>",    
                 inline=False
             )
 
-        await interaction.response.send_message(embed=edit_embed)
+            options.append(discord.SelectOption(label=f"{index + 1} {start.strftime("%b %d %Y")}", description=f"{start.strftime("%I:%M %p")} to {end.strftime("%I:%M %p")}", value=str(index)))
+
+        dropdown = Select(
+            placeholder="Choose an option...",  # Placeholder text when no selection is made
+            min_values=1,  # Minimum number of selections
+            max_values=1,  # Maximum number of selections
+            options=options  # The list of options
+        )
+
+        async def dropdown_callback(interaction_callback: discord.Interaction):
+            if interaction_callback.user.id != interaction.user.id:
+                return
+            selected_option = dropdown.values[0]
+            cb_user_id, cb_date, cb_start_time, cb_end_time, cb_recurring = raw_availabilities[int(selected_option)]
+
+            edit_embed = discord.Embed(
+                title=f"Editting {start.strftime("%b %d %Y")}",
+                description="Please select an availability to edit",
+                color=interaction.user.colour
+            )
+
+
+            await interaction_callback.response.send_message(f"You selected: {selected_option}", ephemeral=True)
+
+        # Assign the callback to the dropdown
+        dropdown.callback = dropdown_callback
+
+        view = View()
+        if len(options) > 0:
+            view.add_item(dropdown)
+
+        await interaction.response.send_message(embed=edit_embed_menu, view=view, ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Availability(bot))
