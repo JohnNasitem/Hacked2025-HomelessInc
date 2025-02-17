@@ -5,7 +5,8 @@ import random
 from discord.ext import commands
 from discord import app_commands
 from discord.ui import View, Select
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont # pip install Pillow
+from dateutil.relativedelta import relativedelta # pip install python-dateutil
 import os
 import sqlite3
 import datetime as dt
@@ -219,17 +220,55 @@ async def display_availabilities(bot, interaction: discord.Interaction, user_str
         if users:
             for t_user in users:
                 for result in db_get_availability(t_user.id):
-                    unfiltered_availabilities_list.append(Availability.convert_row_to_day(result))
+                    unfiltered_availabilities_list.append(result)
         # If users is empty then that means everyone should be considered
         else:
             for result in db_get_all_availabilities():
-                unfiltered_availabilities_list.append(Availability.convert_row_to_day(result))
+                unfiltered_availabilities_list.append(result)
 
         # Filter out any availabilities not happening this week
         filtered_availabilities_list = []
-        for availability in unfiltered_availabilities_list:
-            if week_dates[0].strftime('%Y-%m-%d') <= availability.date <= week_dates[6].strftime('%Y-%m-%d'):
-                filtered_availabilities_list.append(availability)
+        for raw_availability in unfiltered_availabilities_list:
+            # Convert to Day
+            converted_availability = Availability.convert_row_to_day(raw_availability)
+            # Un-package the raw data
+            result_user_id, availability_date, start_time, end_time, recurring = raw_availability
+            #start and end strings
+            start_str, end_str = week_dates[0].strftime('%Y-%m-%d'), week_dates[6].strftime('%Y-%m-%d')
+
+            # Check if the exact date is within the range
+            if start_str <= converted_availability.date <= end_str:
+                filtered_availabilities_list.append(converted_availability)
+
+            if recurring == "daily":
+                for i in range(7):
+                    new_date = datetime.strptime(converted_availability.date if start_str <= converted_availability.date <= end_str else start_str, "%Y-%m-%d") + dt.timedelta(days=i)
+                    if new_date.strftime("%Y-%m-%d") == converted_availability.date:
+                        continue
+                    if new_date.strftime("%Y-%m-%d") > end_str:
+                        break
+                    filtered_availabilities_list.append(Day(converted_availability.user_id, new_date.strftime("%Y-%m-%d"), converted_availability.start_time, converted_availability.end_time))
+            elif recurring == "weekly":
+                if not start_str <= converted_availability.date <= end_str:
+                    new_date = [date.strftime("%Y-%m-%d") for date in week_dates if (date - datetime.strptime(converted_availability.date, "%Y-%m-%d").date()).days % 7 == 0][0]
+                    filtered_availabilities_list.append(Day(converted_availability.user_id, new_date, converted_availability.start_time, converted_availability.end_time))
+            elif recurring == "monthly":
+                if not start_str <= converted_availability.date <= end_str:
+                    new_date = [date.strftime("%Y-%m-%d") for date in week_dates
+                                if relativedelta(date, datetime.strptime(converted_availability.date, "%Y-%m-%d").date()).days == 0
+                                and relativedelta(date, datetime.strptime(converted_availability.date, "%Y-%m-%d").date()).months >= 1]
+                    if len(new_date) > 0:
+                        filtered_availabilities_list.append(Day(converted_availability.user_id, new_date[0], converted_availability.start_time, converted_availability.end_time))
+            elif recurring == "yearly":
+                if not start_str <= converted_availability.date <= end_str:
+                    new_date = [date.strftime("%Y-%m-%d") for date in week_dates
+                                if relativedelta(date, datetime.strptime(converted_availability.date, "%Y-%m-%d").date()).days == 0
+                                and relativedelta(date, datetime.strptime(converted_availability.date, "%Y-%m-%d").date()).months == 0
+                                and relativedelta(date, datetime.strptime(converted_availability.date, "%Y-%m-%d").date()).years >= 1]
+                    if len(new_date) > 0:
+                        filtered_availabilities_list.append(Day(converted_availability.user_id, new_date[0], converted_availability.start_time, converted_availability.end_time))
+
+
 
         await create_image(bot, filtered_availabilities_list, week_dates)
         with open('generated_images/schedule.png', 'rb') as f:
