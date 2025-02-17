@@ -5,6 +5,9 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from discord import app_commands
 from cogs.availabilities import db_clean_up_old
+from cogs.database import reset_availability
+from cogs.events import send_reminders
+from sqlite3 import OperationalError
 
 load_dotenv()
 
@@ -33,8 +36,14 @@ class Client(commands.Bot):
         while not self.is_closed():
             print("Running hourly task")
             # Clean the old expired schedules
-            db_clean_up_old()
-            print("Cleaned up old availabilities")
+            try:
+                db_clean_up_old()
+                print("Cleaned up old availabilities")
+            except OperationalError as op_ex:
+                if op_ex == "no such table: availability":
+                    reset_availability()
+
+            await send_reminders(self)
             # Wait for an hour (3600 seconds) before running again
             await asyncio.sleep(3600)
 

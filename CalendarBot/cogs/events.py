@@ -14,98 +14,9 @@ class Events(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-
     @commands.Cog.listener()
     async def on_ready(self):
         print("Events is ready!")
-        self.bot.loop.create_task(self.event_hourly_task())
-
-    async def send_early_reminder(self):
-        current_datetime = datetime.now()
-        twenty_four_hours_later = current_datetime + timedelta(hours=24)
-        margin = timedelta(minutes=5)
-
-        # find events to that start in about 24 hours that are confirmed to happen
-        query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Confirmed'"
-        cursor.execute(query, (twenty_four_hours_later - margin, twenty_four_hours_later + margin))
-        result = cursor.fetchall()
-        if result:
-            for event in result:
-                # Get the default channel (the first text channel in the guild)
-                guild = self.bot.get_guild(1340369941001539636)  # Replace with your guild ID
-                if guild:
-                    channel_id = event[8]
-                    # find the channel where the user originally created the event
-                    channel = guild.get_channel(channel_id)
-                    if channel:
-                        await channel.send(f"Hey @everyone! The event, **{event[3]}**, will occur in 24 hours!")
-                        print(f"Reminder for {event[3]} sent.")
-                    else:
-                        print("Channel not found.")
-                else:
-                    print("Guild not found.")
-
-    # send reminder when event is starting
-    async def send_starting_reminder(self):
-        current_datetime = datetime.now()
-        margin = timedelta(minutes=5)
-
-        # find events to that start in about 24 hours that are confirmed to happen
-        query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Confirmed'"
-        cursor.execute(query, (current_datetime - margin, current_datetime + margin))
-        result = cursor.fetchall()
-        if result:
-            for event in result:
-                # Get the default channel (the first text channel in the guild)
-                guild = self.bot.get_guild(1340369941001539636)  # Replace with your guild ID
-                if guild:
-                    channel_id = event[8]
-                    # find the channel where the user originally created the event
-                    channel = guild.get_channel(channel_id)
-                    if channel:
-                        await channel.send(f"Hey @everyone! The event, **{event[3]}**, is occurring!")
-                        print(f"Reminder for {event[3]} sent.")
-                    else:
-                        print("Channel not found.")
-                else:
-                    print("Guild not found.")
-
-    # remind creator of event 48 hours before event that their event will be starting
-    async def remind_creator(self):
-        current_datetime = datetime.now()
-        forty_eight_hours_later = current_datetime + timedelta(hours=48)
-        margin = timedelta(minutes=5)
-
-        query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Pending'"
-        cursor.execute(query, (forty_eight_hours_later - margin, forty_eight_hours_later + margin))
-        result = cursor.fetchall()
-        print(result)
-        if result:
-            for event in result:
-                # Get the default channel (the first text channel in the guild)
-                guild = self.bot.get_guild(1340369941001539636)  # Replace with your guild ID
-                if guild:
-                    user_id = event[1]
-                    user = self.bot.get_user(user_id)
-                    if user:
-                        await user.send(f"Hey {user.mention}! The event, **{event[3]}** in **{guild.name}** has not been confirmed yet. Please confirm it (via `/edit-event`) so that server members can be notified 24 hours before!")
-                        print(f"Reminder for {event[3]} sent.")
-                    else:
-                        print("User not found.")
-                else:
-                    print("Guild not found.")
-
-    async def event_hourly_task(self):
-        await self.bot.wait_until_ready()
-        while not self.bot.is_closed():
-            # Check if an event is 24 hours away so we can call a reminder
-            await self.send_early_reminder()
-            await self.send_starting_reminder()
-            await self.remind_creator()
-            print("Sent reminders.")
-
-            # Wait for an hour (3600 seconds) before running again
-            await asyncio.sleep(10)
 
     @app_commands.command(name="create-event", description="Creates an event")
     async def createevent(self, interaction: discord.Interaction):
@@ -227,6 +138,92 @@ class Events(commands.Cog):
 
         delete_event(event_id)
         await interaction.response.send_message(f"Event **{result[3]}** has been **deleted**.") # result[3] is event name
+
+
+async def send_reminders(bot):
+    """
+    Send reminders
+    """
+    await send_early_reminder(bot)
+    await send_starting_reminder(bot)
+    await remind_creator(bot)
+    print("Sent reminders.")
+
+
+async def send_early_reminder(bot):
+    current_datetime = datetime.now()
+    twenty_four_hours_later = current_datetime + timedelta(hours=24)
+    margin = timedelta(minutes=5)
+
+    # find events to that start in about 24 hours that are confirmed to happen
+    query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Confirmed'"
+    cursor.execute(query, (twenty_four_hours_later - margin, twenty_four_hours_later + margin))
+    result = cursor.fetchall()
+    if result:
+        for event in result:
+            # Get the default channel (the first text channel in the guild)
+            guild = bot.get_guild(1340369941001539636)  # Replace with your guild ID
+            if guild:
+                channel_id = event[8]
+                # find the channel where the user originally created the event
+                channel = guild.get_channel(channel_id)
+                if channel:
+                    await channel.send(f"Hey @everyone! The event, **{event[3]}**, will occur in 24 hours!")
+                    print(f"Reminder for {event[3]} sent.")
+                else:
+                    print("Channel not found.")
+            else:
+                print("Guild not found.")
+
+# send reminder when event is starting
+async def send_starting_reminder(bot):
+    current_datetime = datetime.now()
+    margin = timedelta(minutes=5)
+
+    # find events to that start in about 24 hours that are confirmed to happen
+    query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Confirmed'"
+    cursor.execute(query, (current_datetime - margin, current_datetime + margin))
+    result = cursor.fetchall()
+    if result:
+        for event in result:
+            # Get the default channel (the first text channel in the guild)
+            guild = bot.get_guild(1340369941001539636)  # Replace with your guild ID
+            if guild:
+                channel_id = event[8]
+                # find the channel where the user originally created the event
+                channel = guild.get_channel(channel_id)
+                if channel:
+                    await channel.send(f"Hey @everyone! The event, **{event[3]}**, is occurring!")
+                    print(f"Reminder for {event[3]} sent.")
+                else:
+                    print("Channel not found.")
+            else:
+                print("Guild not found.")
+
+# remind creator of event 48 hours before event that their event will be starting
+async def remind_creator(bot):
+    current_datetime = datetime.now()
+    forty_eight_hours_later = current_datetime + timedelta(hours=48)
+    margin = timedelta(minutes=5)
+
+    query = "SELECT * FROM event WHERE StartTime BETWEEN ? AND ? AND Status = 'Pending'"
+    cursor.execute(query, (forty_eight_hours_later - margin, forty_eight_hours_later + margin))
+    result = cursor.fetchall()
+    print(result)
+    if result:
+        for event in result:
+            # Get the default channel (the first text channel in the guild)
+            guild = bot.get_guild(1340369941001539636)  # Replace with your guild ID
+            if guild:
+                user_id = event[1]
+                user = bot.get_user(user_id)
+                if user:
+                    await user.send(f"Hey {user.mention}! The event, **{event[3]}** in **{guild.name}** has not been confirmed yet. Please confirm it (via `/edit-event`) so that server members can be notified 24 hours before!")
+                    print(f"Reminder for {event[3]} sent.")
+                else:
+                    print("User not found.")
+            else:
+                print("Guild not found.")
 
 async def setup(bot):
     await bot.add_cog(Events(bot))
