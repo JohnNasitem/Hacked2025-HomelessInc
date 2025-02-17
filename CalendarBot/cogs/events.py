@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
+import asyncio
 
 import sqlite3
 import time
@@ -158,8 +159,6 @@ class Events(commands.Cog):
         delete_event(event_id)
         await interaction.response.send_message(f"Event **{result[3]}** has been **deleted**.") # result[3] is event name
 
-
-
 async def setup(bot):
     await bot.add_cog(Events(bot))
 
@@ -199,8 +198,6 @@ def change_to_ongoing():
     cursor.execute(query, ("Ongoing", current_datetime, current_datetime))
     database.commit()
 
-# TODO add more changing status logic
-
 # cancel_event cancels the event with the provided id
 def cancel_event(event_id):
     query = "UPDATE event SET Status = ? WHERE ID = ?"
@@ -230,12 +227,6 @@ def fetch_rsvp_response(event_id, response):
     user_ids = [row[0] for row in result]
     count = len(user_ids)
     return count, user_ids
-
-# def rsvp_no(event_id):
-#     query = "SELECT COUNT(*) FROM rsvp WHERE Response = 'no' AND EventID = ?"
-#     cursor.execute(query, (event_id,))
-#     result = cursor.fetchone()
-#     return result[0]
 
 # modal to create event
 class CreateEventModal(discord.ui.Modal, title="Create Event"):
@@ -302,15 +293,17 @@ class EditEventModal(discord.ui.Modal, title="Edit Event"):
         super().__init__()
         self.event_id = event_id
 
-        self.name = discord.ui.TextInput(label="Event Name", style=discord.TextStyle.short, required=True)
+        event = self.get_event_details(event_id)
+
+        self.name = discord.ui.TextInput(label="Event Name", style=discord.TextStyle.short, required=True, default=event['name'])
         self.description = discord.ui.TextInput(label="Event Description", style=discord.TextStyle.paragraph,
-                                                required=False)
+                                                required=False, default=event['description'])
         self.start_time = discord.ui.TextInput(label="Start Time (YYYY-MM-DD HH:MM)", style=discord.TextStyle.short,
-                                               required=True)
+                                               required=True, default=event['start_time'])
         self.end_time = discord.ui.TextInput(label="End Time (YYYY-MM-DD HH:MM)", style=discord.TextStyle.short,
-                                             required=True)
+                                             required=True, default=event['end_time'])
         self.status = discord.ui.TextInput(label="Status (Pending, Confirmed, Cancelled)",
-                                           style=discord.TextStyle.short, required=True)
+                                           style=discord.TextStyle.short, required=True, default=event['status'])
 
         # Add components to the modal
         self.add_item(self.name)
@@ -318,6 +311,22 @@ class EditEventModal(discord.ui.Modal, title="Edit Event"):
         self.add_item(self.start_time)
         self.add_item(self.end_time)
         self.add_item(self.status)
+
+    def get_event_details(self, event_id: int):
+        query = "SELECT * FROM event WHERE ID = ?"
+        cursor.execute(query, (event_id,))
+        result = cursor.fetchone()
+
+        if result:
+            return {
+                'name': result[3],
+                'description': result[4],
+                'start_time': result[5],
+                'end_time': result[6],
+                'status': result[7]
+            }
+        else:
+            return None
 
     async def on_submit(self, interaction: discord.Interaction):
         # check if datetime was inserted properly
