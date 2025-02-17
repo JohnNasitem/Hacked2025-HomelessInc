@@ -17,7 +17,7 @@ class Events(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        print("Bot is online!")
+        print("Events is ready!")
         self.bot.loop.create_task(self.event_hourly_task())
 
     async def send_early_reminder(self):
