@@ -12,17 +12,8 @@ import sqlite3
 import datetime as dt
 from datetime import datetime
 
-# TODO: move to own cog file, one command to load both databases
 database = sqlite3.connect("database.db")
 cursor = database.cursor()
-database.execute("DROP TABLE IF EXISTS availability")
-database.execute("""CREATE TABLE IF NOT EXISTS availability(
-                 USERID INTEGER,
-                 AVAILABILITYDATE TEXT,
-                 StartTime TEXT,
-                 EndTime TEXT,
-                 RECURRING TEXT
-                 )""")
 
 col_header_font = ImageFont.truetype("arial.ttf", 45)
 row_header_font = ImageFont.truetype("arial.ttf", 30)
@@ -196,7 +187,6 @@ class NextButton(Button):
 
         await interaction.edit_original_response(embed=gen_edit_availabilities_embed(self.parent_view.raw_availabilities, self.parent_view.amount, self.parent_view.offset), view=self.parent_view)
 
-
 class PreviousButton(Button):
     def __init__(self, view: View):
         super().__init__(label="Previous", disabled=True)
@@ -222,10 +212,6 @@ class PreviousButton(Button):
         self.parent_view.children[1].options = get_edit_availabilities_options(self.parent_view.raw_availabilities, self.parent_view.amount, self.parent_view.offset)
 
         await interaction.edit_original_response(embed=gen_edit_availabilities_embed(self.parent_view.raw_availabilities, self.parent_view.amount, self.parent_view.offset), view=self.parent_view)
-
-
-
-
 
 class Day:
     """
@@ -287,7 +273,6 @@ class Availability(commands.Cog):
         :return: None
         """
         await edit_availabilities(interaction, 2, 0)
-
 
 async def setup(bot):
     await bot.add_cog(Availability(bot))
