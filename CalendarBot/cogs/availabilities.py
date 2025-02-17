@@ -122,7 +122,18 @@ class Availability(commands.Cog):
 
     @app_commands.command(name="edit-availability", description="Edit your availabilities")
     async def edit_availability(self, interaction: discord.Interaction):
-        print("not implemented")
+        avail_string = ""
+        for index,result in enumerate(db_get_availability(interaction.user.id)):
+            result_user_id, availability_date, start_time, end_time, recurring = result
+            avail_string += f'{index + 1}: <t:{Availability._convertToUnix(availability_date, start_time)}> - <t:{Availability._convertToUnix(availability_date, end_time)}>'
+
+        edit_availability_embed = discord.Embed(
+            title = "Your Availabilities",
+            description = avail_string,
+            color=interaction.user.color
+        )
+
+        await interaction.response.send_message(embed=edit_availability_embed)
 
 async def setup(bot):
     await bot.add_cog(Availability(bot))
