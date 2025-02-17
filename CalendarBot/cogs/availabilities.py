@@ -99,12 +99,14 @@ class EditAvailabilityModal(discord.ui.Modal, title="Edit Availability"):
         self.start_time = discord.ui.TextInput(label="Start Time (HH:MM AM/PM)", style=discord.TextStyle.short,required=True, default=start_time)
         self.end_time = discord.ui.TextInput(label="End Time (HH:MM AM/PM)", style=discord.TextStyle.short,required=True, default=end_time)
         self.recurring = discord.ui.TextInput(label="Recurring (d, w, m, y)", style=discord.TextStyle.short,required=True, default=recurring)
+        self.should_delete = discord.ui.TextInput(label="Delete availability? (YES/NO)", style=discord.TextStyle.short,required=True, default="NO")
 
         # Add components to the modal
         self.add_item(self.date)
         self.add_item(self.start_time)
         self.add_item(self.end_time)
         self.add_item(self.recurring)
+        self.add_item(self.should_delete)
 
     async def on_submit(self, modal_interaction: discord.Interaction):
         recurring_dict = {
@@ -117,6 +119,10 @@ class EditAvailabilityModal(discord.ui.Modal, title="Edit Availability"):
         user_id, old_date, old_start_time, old_end_time, old_recurring = self.old_row  # unpack the tuple
 
         try:
+            if self.should_delete.value.lower() == "yes":
+                db_delete_availability(self.old_row)
+                await modal_interaction.response.send_message("Successfully deleted availability!", ephemeral=True)
+                return
             # Extract data from input fields
             day = self.date.value.lower()
             start_time = self.start_time.value.lower()
@@ -675,6 +681,15 @@ def db_edit_availability(old_row, new_row):
                    SET AVAILABILITYDATE = ?, StartTime = ?, EndTime = ?,  RECURRING = ?
                    WHERE USERID = ? and AVAILABILITYDATE = ? and StartTime = ? and EndTime = ? and RECURRING = ?"""
         cursor.execute(query, (new_date, new_start_time, new_end_time, new_recurring, *old_row))
+        database.commit()
+    except Exception as ex:
+        print(f"Problem with updating database\n{ex}")
+
+def db_delete_availability(row):
+    try:
+        query = """DELETE FROM availability 
+                   WHERE USERID = ? and AVAILABILITYDATE = ? and StartTime = ? and EndTime = ? and RECURRING = ?"""
+        cursor.execute(query, row)
         database.commit()
     except Exception as ex:
         print(f"Problem with updating database\n{ex}")
