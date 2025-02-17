@@ -9,28 +9,6 @@ from datetime import datetime, timedelta
 
 database = sqlite3.connect("database.db")
 cursor = database.cursor()
-database.execute("DROP TABLE IF EXISTS event")
-database.execute("DROP TABLE IF EXISTS rsvp")
-# create event table
-database.execute("""CREATE TABLE IF NOT EXISTS event(
-                 ID INTEGER PRIMARY KEY, 
-                 CreatorID INTEGER,
-                 Creator TEXT,
-                 Name TEXT NOT NULL,
-                 Description TEXT,
-                 StartTime DATETIME,
-                 EndTime DATETIME,
-                 Status TEXT,
-                 ChannelID INTEGER
-                 )""")
-database.execute("""CREATE TABLE IF NOT EXISTS rsvp(
-                 EventID INTEGER,
-                 UserID INTEGER,
-                 User TEXT,
-                 Response TEXT,
-                 PRIMARY KEY(EventID, UserID),
-                 FOREIGN KEY(EventID) REFERENCES event(ID) ON DELETE CASCADE
-                 )""")
 
 class Events(commands.Cog):
     def __init__(self, bot):
