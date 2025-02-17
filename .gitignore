@@ -7,3 +7,5 @@ CalendarBot/.env
 /CalendarBot/.idea
 /CalendarBot/cogs/__pycache__
 /CalendarBot/generated_images
+CalendarBot/database.db
+CalendarBot/cogs/__pycache__/ping.cpython-312.pyc
