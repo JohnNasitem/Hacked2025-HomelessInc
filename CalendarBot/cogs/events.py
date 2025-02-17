@@ -164,7 +164,7 @@ async def send_early_reminder(bot):
     if result:
         for event in result:
             # Get the default channel (the first text channel in the guild)
-            guild = bot.get_guild(1340369941001539636)  # Replace with your guild ID
+            guild = bot.get_guild(int(event[13]))  # Replace with your guild ID
             if guild:
                 channel_id = event[8]
                 # find the channel where the user originally created the event
@@ -200,7 +200,7 @@ async def send_starting_reminder(bot):
     if result:
         for event in result:
             # Get the default channel (the first text channel in the guild)
-            guild = bot.get_guild(1340369941001539636)  # Replace with your guild ID
+            guild = bot.get_guild(int(event[13]))  # Replace with your guild ID
             if guild:
                 channel_id = event[8]
                 # find the channel where the user originally created the event
@@ -238,7 +238,7 @@ async def remind_creator(bot):
     if result:
         for event in result:
             # Get the default channel (the first text channel in the guild)
-            guild = bot.get_guild(1340369941001539636)  # Replace with your guild ID
+            guild = bot.get_guild(int(event[13]))  # Replace with your guild ID
             if guild:
                 user_id = event[1]
                 user = bot.get_user(user_id)
@@ -421,10 +421,10 @@ class CreateEventModal(discord.ui.Modal, title="Create Event"):
             return
 
         try:
-            query = "INSERT INTO event VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            query = "INSERT INTO event VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             database = sqlite3.connect("database.db", 10)
             cursor = database.cursor()
-            cursor.execute(query, (self.event_id, self.creator_id, self.creator, self.name.value, self.description.value, self.start_time.value, self.end_time.value, self.status, self.channel_id, "0", "0", "0"))
+            cursor.execute(query, (self.event_id, self.creator_id, self.creator, self.name.value, self.description.value, self.start_time.value, self.end_time.value, self.status, self.channel_id, "0", "0", "0", interaction.guild.id))
             database.commit()
             cursor.close()
             database.close()

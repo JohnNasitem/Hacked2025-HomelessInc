@@ -69,7 +69,8 @@ def reset_events():
                                  ChannelID INTEGER,
                                  AlreadyRemindedOwner INTEGER,
                                  AlreadyRemindedParticipants INTEGER,
-                                 AlreadyAnnounced INTEGER
+                                 AlreadyAnnounced INTEGER,
+                                 GUILDID INTEGER
                                  )""")
 
 def reset_rsvp():
