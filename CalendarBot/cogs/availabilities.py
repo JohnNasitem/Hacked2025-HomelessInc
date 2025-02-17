@@ -686,6 +686,11 @@ def db_edit_availability(old_row, new_row):
         print(f"Problem with updating database\n{ex}")
 
 def db_delete_availability(row):
+    """
+    Delete a row from the table
+    :param row: Row to delete
+    :return: None
+    """
     try:
         query = """DELETE FROM availability 
                    WHERE USERID = ? and AVAILABILITYDATE = ? and StartTime = ? and EndTime = ? and RECURRING = ?"""
@@ -693,3 +698,19 @@ def db_delete_availability(row):
         database.commit()
     except Exception as ex:
         print(f"Problem with updating database\n{ex}")
+
+def db_clean_up_old():
+    """
+    Deletes all availabilities that aren't recurring and expired
+    :return: None
+    """
+    all_availabilities = db_get_all_availabilities()
+
+    availabilities_to_remove = []
+    for result in all_availabilities:
+        user_id, date, start_time, end_time, recurring = result  # unpack the tuple
+        if date < datetime.today().strftime("%Y-%m-%d") and recurring == "false":
+            availabilities_to_remove = result
+
+    for result_to_remove in availabilities_to_remove:
+        db_delete_availability(db_delete_availability)
