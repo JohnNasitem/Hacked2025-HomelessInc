@@ -159,20 +159,28 @@ class Availability(commands.Cog):
 
 
     @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
-    async def getAvailability(self, interaction: discord.Interaction, user: discord.User):
+    @app_commands.describe(users="Comma-separated list of user IDs")
+    async def getAvailability(self, interaction: discord.Interaction, users: str = None):
         try:
-            week_test = []
-            for result in get_availability(user.id):
-                # result_user_id, availability_date, start_time, end_time, recurring = result
-                # dt_date = datetime.strptime(availability_date, '%Y-%m-%d')
-                # week_test.append(Day(result_user_id, dt_date.strftime('%Y-%m-%d'), start_time, end_time))
-                # print(result)
-                week_test.append(Availability.convert_row_to_day(result))
+            week_data = []
+            if not users:  # if no users are specified, get all availabilities
+                availabilities = get_all_availabilities()
+                for availability in availabilities:
+                    week_data.append(self.convert_row_to_day(availability))
+            else:  # get availabilities for specified users
+                user_ids = [int(user_id.strip()) for user_id in users.split(",")]
+                for user_id in user_ids:
+                    results = get_availability(user_id)
+                    for result in results:
+                        week_data.append(Availability.convert_row_to_day(result))
 
-            today_date = datetime.today()
-            await create_image(self.bot, week_test, int(today_date.strftime("%U")), today_date.year)
+            await create_image(self.bot, week_data)
             with open('generated_images/schedule.png', 'rb') as f:
-                await interaction.response.send_message(f"Availability for <@{user.id}>", file=discord.File(f))
+                if not users:
+                    await interaction.response.send_message("Availability for all users", file=discord.File(f))
+                else:
+                    user_mentions = ", ".join([f"<@{user_id}>" for user_id in user_ids])
+                    await interaction.response.send_message(f"Availability for {user_mentions}", file=discord.File(f))
         except Exception as ex:
             await interaction.response.send_message(f"Something went wrong:\n{ex}")
         
