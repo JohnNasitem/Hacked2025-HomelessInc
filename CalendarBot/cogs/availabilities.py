@@ -4,6 +4,7 @@ import re
 import random
 from discord.ext import commands
 from discord import app_commands
+from discord.ui import View, Select
 from PIL import Image, ImageDraw, ImageFont
 import os
 import sqlite3
@@ -140,7 +141,7 @@ class Availability(commands.Cog):
         avail_string = ""
         for index,result in enumerate(db_get_availability(interaction.user.id)):
             result_user_id, availability_date, start_time, end_time, recurring = result
-            avail_string += f'{index + 1}: <t:{Availability._convertToUnix(availability_date, start_time)}> - <t:{Availability._convertToUnix(availability_date, end_time)}>'
+            avail_string += f'**{index + 1}**: <t:{Availability._convertToUnix(availability_date, start_time)}> - <t:{Availability._convertToUnix(availability_date, end_time)}>'
 
         edit_availability_embed = discord.Embed(
             title = "Your Availabilities",
