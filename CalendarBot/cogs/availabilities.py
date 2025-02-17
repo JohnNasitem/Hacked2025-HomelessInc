@@ -84,7 +84,6 @@ week = [
     Day(381874990783528960, "2025-02-21", "8:00 am", "11:00 am"),
 ]
 
-
 class Availability(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -120,6 +119,12 @@ class Availability(commands.Cog):
         """
         date_time = datetime.strptime(f"{date} {time}", "%Y-%m-%d %I:%M %p")
         return int(datetime.timestamp(date_time))
+
+    @staticmethod
+    def convert_row_to_day(row):
+        result_user_id, availability_date, start_time, end_time, recurring = row
+        dt_date = datetime.strptime(availability_date, '%Y-%m-%d')
+        return Day(result_user_id, dt_date.strftime('%Y-%m-%d'), start_time, end_time)
 
     @app_commands.command(name="set-availability", description="Set your availability for a specific time period")
     @app_commands.describe(repeating="Choose how often this availability repeats")
@@ -157,11 +162,14 @@ class Availability(commands.Cog):
         try:
             week_test = []
             for result in get_availability(user.id):
-                result_user_id, availability_date, start_time, end_time, recurring = result
-                dt_date = datetime.strptime(availability_date, '%Y-%m-%d')
-                week_test.append(Day(result_user_id, dt_date.strftime('%Y-%m-%d'), start_time, end_time))
+                # result_user_id, availability_date, start_time, end_time, recurring = result
+                # dt_date = datetime.strptime(availability_date, '%Y-%m-%d')
+                # week_test.append(Day(result_user_id, dt_date.strftime('%Y-%m-%d'), start_time, end_time))
+                # print(result)
+                week_test.append(Availability.convert_row_to_day(result))
 
-            await create_image(self.bot, week_test)
+            today_date = datetime.today()
+            await create_image(self.bot, week_test, int(today_date.strftime("%U")), today_date.year)
             with open('generated_images/schedule.png', 'rb') as f:
                 await interaction.response.send_message(f"Availability for <@{user.id}>", file=discord.File(f))
         except Exception as ex:
@@ -369,7 +377,6 @@ async def create_image(bot, week_data, week_number, year, show_overlap_count = T
     os.makedirs('generated_images', exist_ok=True)
     # Save and show the result
     background.save('generated_images/schedule.png')
-
 
 def add_availability(user_id, date, start_date_time, end_date_time, recurring):
     """
