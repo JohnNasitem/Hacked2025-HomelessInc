@@ -41,22 +41,24 @@ def discordTime(date_time, format=None):
         return f"<t:{int(datetime.timestamp(date_time))}:D>"
 
 
-class ModifyAvailabilityModal(discord.ui.Modal):
-    def __init__(self, title: str, date: str, start_time: str, end_time: str):
+class ModifyAvailabilityModal(discord.ui.Modal, title="Create Availability"):
+    def __init__(self, title: str, date: str = "", start_time: str = "", end_time: str = ""):
         super().__init__()
-        self.title = title
-        self.date_val = date
-        self.start_time_val = start_time
-        self.end_time_val = end_time
+        # self.date_val = date
+        # self.start_time_val = start_time
+        # self.end_time_val = end_time
 
-        self.date_val = discord.ui.TextInput(label="Date (YYYY-MM-DD)", style=discord.TextStyle.short, required=True)
-        self.start_time = discord.ui.TextInput(label="Start Time (HH:MM AM/PM)", style=discord.TextStyle.short,required=True)
-        self.end_time = discord.ui.TextInput(label="End Time (HH:MM AM/PM)", style=discord.TextStyle.short,required=True)
+        self.date_val = discord.ui.TextInput(label="Date (YYYY-MM-DD)", style=discord.TextStyle.short, required=True, default=date)
+        self.start_time = discord.ui.TextInput(label="Start Time (HH:MM AM/PM)", style=discord.TextStyle.short,required=True, default=start_time)
+        self.end_time = discord.ui.TextInput(label="End Time (HH:MM AM/PM)", style=discord.TextStyle.short,required=True, default=end_time)
 
         # Add components to the modal
         self.add_item(self.date_val)
         self.add_item(self.start_time)
         self.add_item(self.end_time)
+
+    async def on_submit(self, modal_interaction: discord.Interaction):
+        print("Saved!")
 
 
 class Day:
@@ -77,33 +79,6 @@ class Availability(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print("Availability is ready!")
-
-    # depracated function do not use
-    # @staticmethod
-    # def _verifyFormat(date, time):
-    #     """
-    #     Check if date and time is in the following formats respectivel:
-    #     YYYY-MM-DD 
-    #     HH:MM
-
-    #     Returns:
-    #         True if both are in the correct format
-    #         False otherwise
-    #     """
-    #     try:
-    #         datetime.strptime(f"{date} {time}", "%Y-%m-%d %I:%M %p")
-    #         return True
-    #     except ValueError:
-    #         return False
-    
-    # depracated function do not use
-    # @staticmethod
-    # def _convertToUnix(date, time):
-    #     """
-    #     Convert date and time to a Unix timestamp
-    #     """
-    #     date_time = datetime.strptime(f"{date} {time}", "%Y-%m-%d %I:%M %p")
-    #     return int(datetime.timestamp(date_time))
 
     @staticmethod
     def convert_row_to_day(row):
@@ -219,8 +194,8 @@ class Availability(commands.Cog):
                 color=interaction.user.colour
             )
 
-
-            await interaction_callback.response.send_message(f"You selected: {selected_option}", ephemeral=True)
+            modal = ModifyAvailabilityModal("Edit Availability", cb_date, cb_start_time, cb_end_time)
+            await interaction_callback.response.send_modal(modal)
 
         # Assign the callback to the dropdown
         dropdown.callback = dropdown_callback
