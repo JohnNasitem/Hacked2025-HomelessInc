@@ -151,7 +151,7 @@ class Availability(commands.Cog):
             
             await interaction.response.send_message(f"Set availability for <@{interaction.user.id}> from <t:{self._convertToUnix(day, start_time)}> to <t:{self._convertToUnix(day, end_time)}> repeating: {repeating}")
 
-            add_availability(interaction.user.id, day, start_time, end_time, repeating)
+            db_add_availability(interaction.user.id, day, start_time, end_time, repeating)
         
         except Exception as exception:
             await interaction.response.send_message(f"{exception} Please provide the times in the following format: YYYY-MM-DD HH:MM AM/PM")
@@ -160,40 +160,8 @@ class Availability(commands.Cog):
 
     @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
     async def getAvailability(self, interaction: discord.Interaction, user_str: str = ""):
-        try:
-            users = []
-
-            # If argument is left empty then default ot calling user
-            if user_str == "":
-                users.append(interaction.user)
-            else:
-                # Find all numbers in argument
-                user_id_match = re.findall(r'\d+', user_str)
-
-                # Check each id if it is a user id and add it if it is
-                for possible_id in user_id_match:
-                    try:
-                        found_user = await self.bot.fetch_user(possible_id)
-                        users.append(found_user)
-                    except discord.NotFound:
-                        print(f'{possible_id} is an invalid user id')
-
-            week_test = []
-            if users:
-                for t_user in users:
-                    for result in get_availability(t_user.id):
-                        week_test.append(Availability.convert_row_to_day(result))
-            # If users is empty then that means everyone should be considered
-            else:
-                for result in get_all_availabilities():
-                    week_test.append(Availability.convert_row_to_day(result))
-
-            today_date = datetime.today()
-            await create_image(self.bot, week_test, int(today_date.strftime("%U")), today_date.year)
-            with open('generated_images/schedule.png', 'rb') as f:
-                await interaction.response.send_message(f"Availabilities>", file=discord.File(f))
-        except Exception as ex:
-            await interaction.response.send_message(f"Something went wrong:\n{ex}")
+        today_date = datetime.today()
+        await display_availabilties(self.bot, interaction, user_str, int(today_date.strftime("%U")), today_date.year)
         
     @commands.command()
     async def image(self, ctx):
@@ -208,29 +176,77 @@ class Availability(commands.Cog):
 async def setup(bot):
     await bot.add_cog(Availability(bot))
 
-async def create_image(bot, week_data, week_number, year, show_overlap_count = True):
+async def display_availabilities(bot, interaction: discord.Interaction, user_str: str, week_num, year_num):
+    """
+    Display the availability for the specified week
+    :param bot: Bot
+    :param interaction: interaction
+    :param user_str: user ids
+    :param week_num: week number
+    :param year_num: year number
+    :return: None
+    """
+    try:
+        users = []
+        # Jan 1 of whatever year is supplied
+        first_day_of_year = dt.date(year_num, 1, 1)
+        # Get the sunday in this week specified by the week number
+        first_day_of_week = first_day_of_year + dt.timedelta(
+            days=(6 - first_day_of_year.weekday()) % 7) + dt.timedelta(weeks=week_num - 1)
+        week_dates = []
+        # Get the dates within this week
+        for i in range(7):
+            day = first_day_of_week + dt.timedelta(days=i)
+            week_dates.append(day)
+
+        # If argument is left empty then default ot calling user
+        if user_str == "":
+            users.append(interaction.user)
+        else:
+            # Find all numbers in argument
+            user_id_match = re.findall(r'\d+', user_str)
+
+            # Check each id if it is a user id and add it if it is
+            for possible_id in user_id_match:
+                try:
+                    found_user = await bot.fetch_user(possible_id)
+                    users.append(found_user)
+                except discord.NotFound:
+                    print(f'{possible_id} is an invalid user id')
+
+        unfiltered_availabilities_list = []
+        if users:
+            for t_user in users:
+                for result in db_get_availability(t_user.id):
+                    unfiltered_availabilities_list.append(Availability.convert_row_to_day(result))
+        # If users is empty then that means everyone should be considered
+        else:
+            for result in db_get_all_availabilities():
+                unfiltered_availabilities_list.append(Availability.convert_row_to_day(result))
+
+        # Filter out any availabilities not happening this week
+        filtered_availabilities_list = []
+        for availability in unfiltered_availabilities_list:
+            if week_dates[0].strftime('%Y-%m-%d') <= availability.date <= week_dates[6].strftime('%Y-%m-%d'):
+                filtered_availabilities_list.append(availability)
+
+        await create_image(self.bot, filtered_availabilities_list, week_dates)
+        with open('generated_images/schedule.png', 'rb') as f:
+            await interaction.response.send_message(f"Availabilities>", file=discord.File(f))
+    except Exception as ex:
+        await interaction.response.send_message(f"Something went wrong:\n{ex}")
+
+async def create_image(bot, week_data, week_dates, show_overlap_count = True):
     """
     Create an image using a list of days, legend will be included if more than one user id exists in the list.
     :param week_data: list holding instances of Day
     """
-
     def generate_colour_table(user_ids):
         """
         Populate a colour dictionary with random colours
         :param user_ids:
         :return: Color Dictionary (user_id: color)
         """
-
-        # def generate_light_color():
-        #     """
-        #     Generate light colours
-        #     :return: r, g, b values
-        #     """
-        #     r_int = random.randint(180, 255)
-        #     g_int = random.randint(180, 255)
-        #     b_int = random.randint(180, 255)
-        #     return r_int, g_int, b_int
-
         def generate_light_color():
             """
             Generate a light color, avoiding brown or gray shades.
@@ -316,16 +332,6 @@ async def create_image(bot, week_data, week_number, year, show_overlap_count = T
         for x in range(background_width):
             pixels[x, 100 + (rowIndex * 50)] = (0, 0, 0)
 
-    # Jan 1 of whatever year is supplied
-    first_day_of_year = dt.date(year, 1, 1)
-    # Get the sunday in this week specified by the week number
-    first_day_of_week = first_day_of_year + dt.timedelta(days=(6 - first_day_of_year.weekday()) % 7) + dt.timedelta(weeks=week_number - 1)
-    week_dates = []
-    # Get the dates within this week
-    for i in range(7):
-        day = first_day_of_week + dt.timedelta(days=i)
-        week_dates.append(day)
-
     # Populate column headers and draw vertical lines
     for colIndex, day in enumerate(days_of_week):
         #add column header
@@ -398,7 +404,7 @@ async def create_image(bot, week_data, week_number, year, show_overlap_count = T
     # Save and show the result
     background.save('generated_images/schedule.png')
 
-def add_availability(user_id, date, start_date_time, end_date_time, recurring):
+def db_add_availability(user_id, date, start_date_time, end_date_time, recurring):
     """
     Add availability to database
     :param user_id: user id of the availability
@@ -414,7 +420,7 @@ def add_availability(user_id, date, start_date_time, end_date_time, recurring):
     except Exception as ex:
         print(f"problem\n{ex}")
 
-def get_availability(user_id):
+def db_get_availability(user_id):
     """
     Get all the availabilities set for that user id.
     :param user_id: user id to get availabilities for
@@ -424,7 +430,7 @@ def get_availability(user_id):
     cursor.execute(query, (user_id,))
     return cursor.fetchall()
 
-def get_all_availabilities():
+def db_get_all_availabilities():
     """
     Get all the availabilities
     :return: list of tuples
