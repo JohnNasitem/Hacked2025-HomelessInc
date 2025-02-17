@@ -78,8 +78,14 @@ class CreateAvailabilityModal(discord.ui.Modal, title="Create Availability"):
             if start_date.timestamp() > end_date.timestamp():  # Check if start time is before end time
                 raise Exception("Start time cannot be after end time.")
 
-            await modal_interaction.response.send_message(
-                f"Set availability for {modal_interaction.user.mention} from {discordTime(start_date)} to {discordTime(end_date)} repeating: {recurring}")
+            #await modal_interaction.response.send_message(
+                #f"Set availability for {modal_interaction.user.mention} from {discordTime(start_date)} to {discordTime(end_date)} repeating: {recurring}")
+
+            await modal_interaction.response.send_message(embed=discord.Embed(
+                title = "Successfully set availability!",
+                description = f"Date: {discordTime(start_date, 'D')}\nTime: {discordTime(start_date, 't')} - {discordTime(end_date, 't')}\nRecurring: {recurring}",
+                color = modal_interaction.user.colour
+            ), ephemeral=True)
 
             db_add_availability(modal_interaction.user.id, day, start_time, end_time, recurring)
         except KeyError:
@@ -201,8 +207,8 @@ class Availability(commands.Cog):
                 color=interaction.user.colour
             )
 
-            modal = ModifyAvailabilityModal("Edit Availability", cb_date, cb_start_time, cb_end_time)
-            await interaction_callback.response.send_modal(modal)
+            #modal = ModifyAvailabilityModal("Edit Availability", cb_date, cb_start_time, cb_end_time)
+            #await interaction_callback.response.send_modal(modal)
 
         # Assign the callback to the dropdown
         dropdown.callback = dropdown_callback
