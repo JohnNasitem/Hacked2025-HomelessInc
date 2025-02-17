@@ -159,28 +159,35 @@ class Availability(commands.Cog):
 
 
     @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
-    @app_commands.describe(users="Comma-separated list of user IDs")
-    async def getAvailability(self, interaction: discord.Interaction, users: str = None):
+    async def getAvailability(self, interaction: discord.Interaction, user_str: str = ""):
         try:
-            week_data = []
-            if not users:  # if no users are specified, get all availabilities
-                availabilities = get_all_availabilities()
-                for availability in availabilities:
-                    week_data.append(self.convert_row_to_day(availability))
-            else:  # get availabilities for specified users
-                user_ids = [int(user_id.strip()) for user_id in users.split(",")]
-                for user_id in user_ids:
-                    results = get_availability(user_id)
-                    for result in results:
-                        week_data.append(Availability.convert_row_to_day(result))
+            users = []
+
+            # If argument is left empty then default ot calling user
+            if user_str == "":
+                users.append(interaction.user.id)
+            else:
+                # Find all numbers in argument
+                user_id_match = re.findall(r'\d+', user_str)
+
+                # Check each id if it is a user id and add it if it is
+                for possible_id in user_id_match:
+                    try:
+                        found_user = await self.bot.fetch_user(possible_id)
+                        users.append(found_user)
+                    except discord.NotFound:
+                        print(f'{possible_id} is an invalid user id')
+
+            # If users remains empty then that means everyone should be considered
+
+            week_test = []
+            for t_user in users:
+                for result in get_availability(t_user.id):
+                    week_test.append(Availability.convert_row_to_day(result))
 
             await create_image(self.bot, week_data)
             with open('generated_images/schedule.png', 'rb') as f:
-                if not users:
-                    await interaction.response.send_message("Availability for all users", file=discord.File(f))
-                else:
-                    user_mentions = ", ".join([f"<@{user_id}>" for user_id in user_ids])
-                    await interaction.response.send_message(f"Availability for {user_mentions}", file=discord.File(f))
+                await interaction.response.send_message(f"Availabilities>", file=discord.File(f))
         except Exception as ex:
             await interaction.response.send_message(f"Something went wrong:\n{ex}")
         
@@ -359,7 +366,7 @@ async def create_image(bot, week_data, week_number, year, show_overlap_count = T
         # Nested loop to iterate through each cell
         for colIndex, day_in_week in enumerate(days_of_week):
             for time_index in range(48):
-                count = len([time_slot for time_slot in week if get_time_index(time_slot.start_time) <= time_index < get_time_index(time_slot.end_time) and datetime.strptime(time_slot.date, '%Y-%m-%d').strftime('%A') == day_in_week])
+                count = len([time_slot for time_slot in week_data if get_time_index(time_slot.start_time) <= time_index < get_time_index(time_slot.end_time) and datetime.strptime(time_slot.date, '%Y-%m-%d').strftime('%A') == day_in_week])
                 if count != 0:
                     draw.text((350 + (colIndex * 300), 135 + (time_index * 50)), str(count), font=row_header_font, fill=(0, 0, 0), anchor="ms")
 
