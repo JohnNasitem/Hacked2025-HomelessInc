@@ -233,7 +233,7 @@ async def display_availabilities(bot, interaction: discord.Interaction, user_str
 
         await create_image(bot, filtered_availabilities_list, week_dates)
         with open('generated_images/schedule.png', 'rb') as f:
-            await interaction.response.send_message(f"Availabilities>", file=discord.File(f))
+            await interaction.response.send_message(f"Availabilities:", file=discord.File(f))
     except Exception as ex:
         await interaction.response.send_message(f"Something went wrong:\n{ex}")
 
