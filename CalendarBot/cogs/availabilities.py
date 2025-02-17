@@ -164,18 +164,32 @@ class Availability(commands.Cog):
             await interaction.response.send_message(f"{exception} Please provide the times in the following format: YYYY-MM-DD HH:MM AM/PM")
             return None
 
+
     @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
-    async def getAvailability(self, interaction: discord.Interaction, user: discord.User):
-        try:
-            week_test = []
-            results = get_availability(user.id)
-            for result in results:
-                week_test.append(Availability.convert_row_to_day(result))
-            await create_image(self.bot, week_test)
-            with open('generated_images/schedule.png', 'rb') as f:
-                await interaction.response.send_message(f"Availability for <@{user.id}>", file=discord.File(f))
-        except Exception as ex:
-            await interaction.response.send_message(f"Something went wrong:\n{ex}")
+    async def getAvailability(self, interaction: discord.Interaction, user: discord.User=None):
+        if user is None:  # if no user is specified assume all users
+            try:
+                week_data = []
+                availabilities = get_all_availabilities()  # list of tuples of all availabilities
+                for availability in availabilities:
+                    week_data.append(self.convert_row_to_day(availability))
+                
+                await create_image(self.bot, week_data)
+                with open('generated_images/schedule.png', 'rb') as f:
+                    await interaction.response.send_message("Availability for all users", file=discord.File(f))
+            except Exception as ex:
+                await interaction.response.send_message(f"Something went wrong:\n{ex}")
+        else:
+            try:
+                week_test = []
+                results = get_availability(user.id)
+                for result in results:
+                    week_test.append(Availability.convert_row_to_day(result))
+                await create_image(self.bot, week_test)
+                with open('generated_images/schedule.png', 'rb') as f:
+                    await interaction.response.send_message(f"Availability for <@{user.id}>", file=discord.File(f))
+            except Exception as ex:
+                await interaction.response.send_message(f"Something went wrong:\n{ex}")
         
     @commands.command()
     async def image(self, ctx):
@@ -388,4 +402,13 @@ def get_availability(user_id):
     """
     query = "SELECT * FROM availability WHERE USERID = ?"
     cursor.execute(query, (user_id,))
+    return cursor.fetchall()
+
+def get_all_availabilities():
+    """
+    Get all the availabilities
+    :return: list of tuples
+    """
+    query = "SELECT * FROM availability"
+    cursor.execute(query)
     return cursor.fetchall()
