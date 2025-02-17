@@ -3,8 +3,8 @@ import discord
 import re
 import random
 from discord.ext import commands
-from discord import app_commands
-from discord.ui import View, Select
+from discord import app_commands, Interaction
+from discord.ui import View, Select, Button
 from PIL import Image, ImageDraw, ImageFont # pip install Pillow
 from dateutil.relativedelta import relativedelta # pip install python-dateutil
 import os
@@ -12,6 +12,7 @@ import sqlite3
 import datetime as dt
 from datetime import datetime
 
+# TODO: move to own cog file, one command to load both databases
 database = sqlite3.connect("database.db")
 cursor = database.cursor()
 database.execute("DROP TABLE IF EXISTS availability")
@@ -160,6 +161,72 @@ class EditAvailabilityModal(discord.ui.Modal, title="Edit Availability"):
                 ephemeral=True)
             return None
 
+class EditAvailabilityView(View):
+    def __init__(self, raw_availabilities, amount, offset):
+        super().__init__()
+        self.raw_availabilities = raw_availabilities
+        self.amount = amount
+        self.offset = offset
+
+class NextButton(Button):
+    def __init__(self, view: View):
+        super().__init__(label="Next")
+        self.parent_view = view
+
+        if len(view.raw_availabilities) <= view.amount:
+            self.disabled = True
+
+    async def callback(self, interaction: discord.Interaction):
+        print("Button pressed")
+        await interaction.response.defer()
+        # Enable previous button
+        self.parent_view.children[0].disabled = False
+
+        # Increment offset
+        self.parent_view.offset += self.parent_view.amount
+
+        print(f'offset: {self.parent_view.offset} - amount: {self.parent_view.amount}')
+
+        # Disable next button if it reached the end
+        if len(self.parent_view.raw_availabilities) < self.parent_view.offset + self.parent_view.amount:
+            self.disabled = True
+
+        #update options
+        self.parent_view.children[1].options = get_edit_availabilities_options(self.parent_view.raw_availabilities, self.parent_view.amount, self.parent_view.offset)
+
+        await interaction.edit_original_response(embed=gen_edit_availabilities_embed(self.parent_view.raw_availabilities, self.parent_view.amount, self.parent_view.offset), view=self.parent_view)
+
+
+class PreviousButton(Button):
+    def __init__(self, view: View):
+        super().__init__(label="Previous", disabled=True)
+        self.parent_view = view
+
+    async def callback(self, interaction: discord.Interaction):
+        print("Button pressed")
+
+        await interaction.response.defer()
+        # Enable next button
+        self.parent_view.children[2].disabled = False
+
+        # Increment offset
+        self.parent_view.offset -= self.parent_view.amount
+
+        print(f'offset: {self.parent_view.offset} - amount: {self.parent_view.amount}')
+
+        # Disable next button if it reached the end
+        if self.parent_view.offset == 0:
+            self.disabled = True
+
+        # update options
+        self.parent_view.children[1].options = get_edit_availabilities_options(self.parent_view.raw_availabilities, self.parent_view.amount, self.parent_view.offset)
+
+        await interaction.edit_original_response(embed=gen_edit_availabilities_embed(self.parent_view.raw_availabilities, self.parent_view.amount, self.parent_view.offset), view=self.parent_view)
+
+
+
+
+
 class Day:
     """
     Holds an availability slot on the selected day for a specific user
@@ -219,62 +286,93 @@ class Availability(commands.Cog):
         :param interaction: interaction
         :return: None
         """
+        await edit_availabilities(interaction, 2, 0)
 
-        edit_embed_menu = discord.Embed(
-            title = "Edit Availabilities",
-            description = "Please select an availability to edit",
-            color = interaction.user.colour
+
+async def setup(bot):
+    await bot.add_cog(Availability(bot))
+
+def gen_edit_availabilities_embed(raw_availabilities, amount, offset):
+    """
+    Generate an embed from the provided data within the provided range
+    :param raw_availabilities: data
+    :param amount: how many to display
+    :param offset: starting offset
+    :return: Embed
+    """
+
+    if amount > 25:
+        raise Exception("Amount cannot be larger than 25")
+
+    edit_embed_menu = discord.Embed(
+        title="Edit Availabilities",
+        description="Please select an availability to edit",
+    )
+
+    for index, result in enumerate(raw_availabilities):
+        if index < offset:
+            continue
+        if index == offset + amount:
+            break
+
+        user_id, date, start_time, end_time, recurring = result  # unpack the tuple
+
+        # create datetime objects for start and end to simplify
+        start = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %I:%M %p")
+        end = datetime.strptime(f"{date} {end_time}", "%Y-%m-%d %I:%M %p")
+
+        edit_embed_menu.add_field(
+            name=f"{index + 1} {discordTime(start, 'D')}",
+            value=f"{discordTime(start, 't')} to {discordTime(end, 't')}",
+            inline=False
         )
 
-        options = []
+    return edit_embed_menu
+
+def get_edit_availabilities_options(raw_availabilities, amount, offset):
+    options = []
+    for index, result in enumerate(raw_availabilities):
+        if index < offset:
+            continue
+        if index == offset + amount:
+            break
+
+        user_id, date, start_time, end_time, recurring = result  # unpack the tuple
+
+        # create datetime objects for start and end to simplify
+        start = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %I:%M %p")
+        end = datetime.strptime(f"{date} {end_time}", "%Y-%m-%d %I:%M %p")
+
+        options.append(discord.SelectOption(label=f"{index + 1}. {start.strftime("%b %d %Y")}",
+                                            description=f"{start.strftime("%I:%M %p")} to {end.strftime("%I:%M %p")}",
+                                            value=str(index)))
+    return options
+
+async def edit_availabilities(interaction: discord.Interaction, amount: int, offset: int):
+    try:
         raw_availabilities = db_get_availability(interaction.user.id)
-
-        for index,result in enumerate(raw_availabilities):
-            user_id, date, start_time, end_time, recurring = result  # unpack the tuple
-
-            # create datetime objects for start and end to simplify
-            start = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %I:%M %p")
-            end = datetime.strptime(f"{date} {end_time}", "%Y-%m-%d %I:%M %p")
-
-            edit_embed_menu.add_field(
-                name = f"{index + 1} {discordTime(start, 'D')}",
-                value = f"{discordTime(start, 't')} to {discordTime(end, 't')}",    
-                inline=False
-            )
-
-            options.append(discord.SelectOption(label=f"{index + 1}. {start.strftime("%b %d %Y")}", description=f"{start.strftime("%I:%M %p")} to {end.strftime("%I:%M %p")}", value=str(index)))
-
         dropdown = Select(
             placeholder="Choose an option...",  # Placeholder text when no selection is made
             min_values=1,  # Minimum number of selections
             max_values=1,  # Maximum number of selections
-            options=options  # The list of options
+            options=get_edit_availabilities_options(raw_availabilities, amount, offset)
         )
 
         async def dropdown_callback(interaction_callback: discord.Interaction):
-            if interaction_callback.user.id != interaction.user.id:
-                return
-            selected_option = dropdown.values[0]
-
-            edit_embed = discord.Embed(
-                title=f"Editting {start.strftime("%b %d %Y")}",
-                description="Please select an availability to edit",
-                color=interaction.user.colour
-            )
-
-            await interaction_callback.response.send_modal(EditAvailabilityModal(raw_availabilities[int(selected_option)]))
+            await interaction_callback.response.send_modal(EditAvailabilityModal(raw_availabilities[int(dropdown.values[0])]))
 
         # Assign the callback to the dropdown
         dropdown.callback = dropdown_callback
 
-        view = View()
-        if len(options) > 0:
+        view = EditAvailabilityView(raw_availabilities, amount, offset)
+        if len(dropdown.options) > 0:
+            view.add_item(PreviousButton(view))
             view.add_item(dropdown)
+            view.add_item(NextButton(view))
 
-        await interaction.response.send_message(embed=edit_embed_menu, view=view, ephemeral=True)
-
-async def setup(bot):
-    await bot.add_cog(Availability(bot))
+        await interaction.response.send_message(embed=gen_edit_availabilities_embed(raw_availabilities, amount, offset), view=view, ephemeral=True)
+    except Exception as ex:
+        print(ex)
 
 async def display_availabilities(bot, interaction: discord.Interaction, user_str: str, week_num, year_num):
     """
