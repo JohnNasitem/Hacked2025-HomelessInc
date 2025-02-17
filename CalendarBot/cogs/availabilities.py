@@ -111,9 +111,15 @@ class Availability(commands.Cog):
             await interaction.response.send_message(f"{exception} Please provide the times in the following format: YYYY-MM-DD HH:MM AM/PM")
             return None
 
-
     @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
     async def get_availability(self, interaction: discord.Interaction, user_str: str = "", week_num: int = -1):
+        """
+        get availability slash command
+        :param interaction: interaction
+        :param user_str: users to get availabilities from
+        :param week_num: specified week num
+        :return: None
+        """
         today_date = datetime.today()
 
         if week_num < 0:
@@ -122,6 +128,11 @@ class Availability(commands.Cog):
 
     @app_commands.command(name="edit-availability", description="Edit your availabilities")
     async def edit_availability(self, interaction: discord.Interaction):
+        """
+        edit availability slash command
+        :param interaction: interaction
+        :return: None
+        """
         avail_string = ""
         for index,result in enumerate(db_get_availability(interaction.user.id)):
             result_user_id, availability_date, start_time, end_time, recurring = result
