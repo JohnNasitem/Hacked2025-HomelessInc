@@ -41,24 +41,60 @@ def discordTime(date_time, format=None):
         return f"<t:{int(datetime.timestamp(date_time))}:D>"
 
 
-class ModifyAvailabilityModal(discord.ui.Modal, title="Create Availability"):
-    def __init__(self, title: str, date: str = "", start_time: str = "", end_time: str = ""):
+class CreateAvailabilityModal(discord.ui.Modal, title="Create Availability"):
+    def __init__(self):
         super().__init__()
-        # self.date_val = date
-        # self.start_time_val = start_time
-        # self.end_time_val = end_time
-
-        self.date_val = discord.ui.TextInput(label="Date (YYYY-MM-DD)", style=discord.TextStyle.short, required=True, default=date)
-        self.start_time = discord.ui.TextInput(label="Start Time (HH:MM AM/PM)", style=discord.TextStyle.short,required=True, default=start_time)
-        self.end_time = discord.ui.TextInput(label="End Time (HH:MM AM/PM)", style=discord.TextStyle.short,required=True, default=end_time)
+        # Inputs
+        self.date = discord.ui.TextInput(label="Date (YYYY-MM-DD)", style=discord.TextStyle.short, required=True, default=datetime.today().strftime("%Y-%m-%d"))
+        self.start_time = discord.ui.TextInput(label="Start Time (HH:MM AM/PM)", style=discord.TextStyle.short,required=True)
+        self.end_time = discord.ui.TextInput(label="End Time (HH:MM AM/PM)", style=discord.TextStyle.short,required=True)
+        self.recurring = discord.ui.TextInput(label="Recurring (d, w, m, y)", style=discord.TextStyle.short,required=True, default="no")
 
         # Add components to the modal
-        self.add_item(self.date_val)
+        self.add_item(self.date)
         self.add_item(self.start_time)
         self.add_item(self.end_time)
+        self.add_item(self.recurring)
 
     async def on_submit(self, modal_interaction: discord.Interaction):
-        print("Saved!")
+        recurring_dict = {
+            'no': 'false',  # No recurrence
+            'd': 'daily',  # Daily recurrence
+            'w': 'weekly',  # Weekly recurrence
+            'm': 'monthly',  # Monthly recurrence
+            'y': 'yearly'  # Yearly recurrence
+        }
+
+        try:
+            # Extract data from input fields
+            day = self.date.value.lower()
+            start_time = self.start_time.value.lower()
+            end_time = self.end_time.value.lower()
+            recurring = recurring_dict[self.recurring.value.lower()]
+            # create datetime objects for start and end to simplify
+            start_date = datetime.strptime(f"{day} {start_time}", "%Y-%m-%d %I:%M %p")
+            end_date = datetime.strptime(f"{day} {end_time}", "%Y-%m-%d %I:%M %p")
+
+            if start_date.timestamp() > end_date.timestamp():  # Check if start time is before end time
+                raise Exception("Start time cannot be after end time.")
+
+            await modal_interaction.response.send_message(
+                f"Set availability for {modal_interaction.user.mention} from {discordTime(start_date)} to {discordTime(end_date)} repeating: {recurring}")
+
+            db_add_availability(modal_interaction.user.id, day, start_time, end_time, recurring)
+        except KeyError:
+            await modal_interaction.response.send_message(
+                content="Invalid recurring option. Options: no, d, w, m, y",
+                ephemeral=True)
+        except ValueError:
+            await modal_interaction.response.send_message(
+                content="Improperly formatted date or time. Please provide the times in the following format: YYYY-MM-DD HH:MM AM/PM",
+                ephemeral=True)
+        except Exception as exception:
+            await modal_interaction.response.send_message(
+                content=f"{exception} Please provide the times in the following format: YYYY-MM-DD HH:MM AM/PM",
+                ephemeral=True)
+            return None
 
 
 class Day:
@@ -87,18 +123,7 @@ class Availability(commands.Cog):
         return Day(result_user_id, dt_date.strftime('%Y-%m-%d'), start_time, end_time)
 
     @app_commands.command(name="set-availability", description="Set your availability for a specific time period")
-    @app_commands.describe(day="Choose the day you are available (YYYY-MM-DD)",
-                           start_time="Choose the time you are available to start (HH:MM AM/PM)",
-                           end_time="Choose the time you are available to end (HH:MM AM/PM)",
-                           repeating="Choose how often this availability repeats (Default: no repeat)",)
-    @app_commands.choices(repeating=[
-        discord.app_commands.Choice(name="Does not repeat", value="false"),
-        discord.app_commands.Choice(name="Daily", value="daily"),
-        discord.app_commands.Choice(name="Weekly", value="weekly"),
-        discord.app_commands.Choice(name="Monthly", value="monthly"),
-        discord.app_commands.Choice(name="Yearly", value="yearly")
-    ])
-    async def set_availability(self, interaction: discord.Interaction, start_time: str, end_time: str, day: str=None, repeating: str = "false"):
+    async def set_availability(self, interaction: discord.Interaction):
         """
         Set the availability for a specific time period
 
@@ -108,25 +133,7 @@ class Availability(commands.Cog):
 
         shouts out to chris for getting slash commands to work
         """
-        try:
-            if day is None:
-                day = datetime.today().strftime("%Y-%m-%d") 
-            # create datetime objects for start and end to simplify
-            start_date = datetime.strptime(f"{day} {start_time}", "%Y-%m-%d %I:%M %p")
-            end_date = datetime.strptime(f"{day} {end_time}", "%Y-%m-%d %I:%M %p")
-
-            if start_date.timestamp() > end_date.timestamp():  # Check if start time is before end time
-                raise Exception("Start time cannot be after end time.")
-            
-            await interaction.response.send_message(f"Set availability for {interaction.user.mention} from {discordTime(start_date)} to {discordTime(end_date)} repeating: {repeating}")
-
-            db_add_availability(interaction.user.id, day, start_time, end_time, repeating)
-        
-        except ValueError:
-            await interaction.response.send_message(content="Improperly formatted date or time. Please provide the times in the following format: YYYY-MM-DD HH:MM AM/PM", ephemeral=True)
-        except Exception as exception:
-            await interaction.response.send_message(content=f"{exception} Please provide the times in the following format: YYYY-MM-DD HH:MM AM/PM", ephemeral=True)
-            return None
+        await interaction.response.send_modal(CreateAvailabilityModal())
 
     @app_commands.command(name="get-availability", description="Get availability for a specific user(s)")
     async def get_availability(self, interaction: discord.Interaction, user_str: str = "", week_num: int = -1):
@@ -509,3 +516,15 @@ def db_get_all_availabilities():
     query = "SELECT * FROM availability"
     cursor.execute(query)
     return cursor.fetchall()
+
+def db_edit_availability(old_row, new_row):
+    old_user_id, old_date, old_start_time, old_end_time, old_recurring = old_row
+
+    try:
+        query = """UPDATE availability 
+                   SET AVAILABILITYDATE = ?, StartTime = ?, EndTime = ? 
+                   WHERE USERID = ? AVAILABILITYDATE = ?, StartTime = ?, EndTime = ?, RECURRING = ?"""
+        cursor.execute(query, (old_date, old_start_time, old_end_time, *new_row))
+        database.commit()
+    except Exception as ex:
+        print(f"Problem with updating database\n{ex}")
