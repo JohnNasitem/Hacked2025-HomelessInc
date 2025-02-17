@@ -1,7 +1,10 @@
 /.idea
 /DiscordBot/.idea
-/.env
 DiscordBot/.env
 /CalenderBot/.idea
-CalendarBot/.env
+CalenderBot/.env
 /CalendarBot/.idea
+/CalendarBot/generated_images
+/CalendarBot/cogs/__pycache__
+CalendarBot/.env
+CalendarBot/database.db
