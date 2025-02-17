@@ -102,6 +102,10 @@ class Availability(commands.Cog):
         try:
             if not self._correctDateTimeFormat(day, start_time) or not self._correctDateTimeFormat(day, end_time):  # verify if start and end correctly formatted
                 raise Exception("Invalid date_time format.")
+
+            if self._convertToUnix(day, start_time) > self._convertToUnix(day, end_time):
+                await interaction.response.send_message("Start time cannot be after end time!")
+                return
             
             await interaction.response.send_message(f"Set availability for <@{interaction.user.id}> from <t:{self._convertToUnix(day, start_time)}> to <t:{self._convertToUnix(day, end_time)}> repeating: {repeating}")
 
